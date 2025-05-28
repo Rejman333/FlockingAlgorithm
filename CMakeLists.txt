@@ -16,5 +16,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(raylib)
 
 
-add_executable(Boids src/main.cpp)
+add_executable(Boids src/main.cpp
+        src/data_structures/hash_table.cpp
+        src/data_structures/hash_table.h)
 target_link_libraries(${PROJECT_NAME} raylib)

@@ -13,7 +13,27 @@ struct boid {
     Vector2 position;
     Vector2 velocity;
     Vector2 acceleration;
+
+    int hash_table_id;
 };
+
+
+void fill_boids(std::array<boid, NUMBER_OF_BOIDS>& boids, const int screenWidth, const int screenHeight) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
+    std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
+    std::uniform_real_distribution distribution(-5.0f, 5.0f);
+
+
+
+    for (auto &b: boids) {
+        b.position = {distribution_x(gen), distribution_y(gen)};
+        b.velocity = {distribution(gen), distribution(gen)};
+        b.acceleration = {.0f, 0.f};
+
+    }
+}
 
 inline float calculate_distance_squared(const Vector2 &from, const Vector2 &to) noexcept {
     const float dx = to.x - from.x;
@@ -112,19 +132,9 @@ int main() {
     constexpr int screenWidth = 1200;
     constexpr int screenHeight = 800;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
-    std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
-    std::uniform_real_distribution distribution(-5.0f, 5.0f);
-
     std::array<boid, NUMBER_OF_BOIDS> boids{};
 
-    for (auto &b: boids) {
-        b.position = {distribution_x(gen), distribution_y(gen)};
-        b.velocity = {distribution(gen), distribution(gen)};
-        b.acceleration = {.0f, 0.f};
-    }
+
 
     const float separation_range = 20.0f;
     const float alignment_range = 50.0f;
