@@ -133,7 +133,7 @@ int main() {
     constexpr int screenHeight = 800;
 
     std::array<boid, NUMBER_OF_BOIDS> boids{};
-
+    fill_boids(boids,screenWidth, screenHeight);
 
 
     const float separation_range = 20.0f;
