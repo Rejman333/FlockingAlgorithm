@@ -5,9 +5,11 @@
 
 #include "raylib.h"
 #include "raymath.h"
+#include "data_structures/hash_table.h"
 
 #define NUMBER_OF_BOIDS 400
 #define BOID_RADIUS 2
+#define CELL_SIZE 50
 
 struct boid {
     Vector2 position;
@@ -18,7 +20,8 @@ struct boid {
 };
 
 
-void fill_boids(std::array<boid, NUMBER_OF_BOIDS>& boids, const int screenWidth, const int screenHeight) {
+void fill_boids(std::array<boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
+                const HashTable &hash_table) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
@@ -26,12 +29,12 @@ void fill_boids(std::array<boid, NUMBER_OF_BOIDS>& boids, const int screenWidth,
     std::uniform_real_distribution distribution(-5.0f, 5.0f);
 
 
+    for (auto &boid: boids) {
+        boid.position = {distribution_x(gen), distribution_y(gen)};
+        boid.velocity = {distribution(gen), distribution(gen)};
+        boid.acceleration = {.0f, 0.f};
 
-    for (auto &b: boids) {
-        b.position = {distribution_x(gen), distribution_y(gen)};
-        b.velocity = {distribution(gen), distribution(gen)};
-        b.acceleration = {.0f, 0.f};
-
+        boid.hash_table_id = hash_table.get_cell_id(boid.position);
     }
 }
 
@@ -126,23 +129,26 @@ void cohesion(const int boid_id,
     }
 }
 
+
+
 int main() {
     // Initialization
     //--------------------------------------------------------------------------------------
     constexpr int screenWidth = 1200;
     constexpr int screenHeight = 800;
 
+    const auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
     std::array<boid, NUMBER_OF_BOIDS> boids{};
-    fill_boids(boids,screenWidth, screenHeight);
+    fill_boids(boids, screenWidth, screenHeight, hash_table);
 
 
-    const float separation_range = 20.0f;
-    const float alignment_range = 50.0f;
-    const float cohesion_range = 50.0f;
+    constexpr float separation_range = 20.0f;
+    constexpr float alignment_range = 50.0f;
+    constexpr float cohesion_range = 50.0f;
 
-    const float separation_range_squared = separation_range * separation_range;
-    const float alignment_range_squared = alignment_range * alignment_range;
-    const float cohesion_range_squared = cohesion_range * cohesion_range;
+    constexpr float separation_range_squared = separation_range * separation_range;
+    constexpr float alignment_range_squared = alignment_range * alignment_range;
+    constexpr float cohesion_range_squared = cohesion_range * cohesion_range;
 
     const float separation_strength = 0.85f;
     const float alignment_strength = 0.8f;
@@ -152,32 +158,43 @@ int main() {
     const float max_force = 0.20f;
 
     const float fov_angle_radians = DEG2RAD * 60.0f;
+    const int scan_range_in_cells = static_cast<int>(std::max(separation_strength, alignment_strength, cohesion_strength)/CELL_SIZE);
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "Boids");
-
-
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
 
     // Main game loop
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         // Update
         //----------------------------------------------------------------------------------
-        // TODO: Update your variables here
-        //----------------------------------------------------------------------------------
+        for (auto boid: boids) {
+            //This is an optimization that works because fov_angle_radians <=  DEG2RAD * 90.0f
+            std::vector<int> cell_index(scan_range_in_cells * scan_range_in_cells + 1);
+            if(boid.velocity.x >= 0) {
 
-        for (int i = 0; i < boids.size(); ++i) {
+            }
+            else{}
+            if(boid.velocity.y >= 0){}
+            else{}
+
+
+
+            for (int i = 0; i < boids.size(); ++i) { }
             std::vector<std::pair<int, float> > neighbors_index_distance;
             neighbors_index_distance.reserve(NUMBER_OF_BOIDS);
+
+
+            if(boid)
+
+
             for (int j = 0; j < boids.size(); j++) {
                 const float distance = calculate_distance_squared(boids[i].position, boids[j].position);
                 if (distance < cohesion_range_squared) {
                     Vector2 distance_vector = Vector2Subtract(boids[j].position, boids[i].position);
                     float angle = Vector2Angle(boids[i].velocity, distance_vector);
-                    if(angle < fov_angle_radians) neighbors_index_distance.emplace_back(j, distance);
-
+                    if (angle < fov_angle_radians) neighbors_index_distance.emplace_back(j, distance);
                 }
             }
             separation(i, boids, neighbors_index_distance, separation_range_squared, separation_strength);
@@ -187,7 +204,7 @@ int main() {
 
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 m_pos = GetMousePosition();
-            for (auto & boid : boids) {
+            for (auto &boid: boids) {
                 const float distance = calculate_distance_squared(boid.position, m_pos);
                 if (distance < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
@@ -196,7 +213,7 @@ int main() {
             }
         } else if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             Vector2 m_pos = GetMousePosition();
-            for (auto & boid : boids) {
+            for (auto &boid: boids) {
                 const float distance = calculate_distance_squared(boid.position, m_pos);
                 if (distance < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
