@@ -6,43 +6,32 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "data_structures/hash_table.h"
+#include "data_structures/Boid.h"
 
-#define NUMBER_OF_BOIDS 400
-#define BOID_RADIUS 2
+#define NUMBER_OF_BOIDS 200
+#define BOID_RADIUS 5
 #define CELL_SIZE 50
 
-struct boid {
-    Vector2 position;
-    Vector2 velocity;
-    Vector2 acceleration;
 
-    int hash_table_id;
-};
-
-
-void fill_boids(std::array<boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
-                const HashTable &hash_table) {
+void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
+                HashTable &hash_table) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
     std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
     std::uniform_real_distribution distribution(-5.0f, 5.0f);
 
-
+    int boid_index = 0;
     for (auto &boid: boids) {
         boid.position = {distribution_x(gen), distribution_y(gen)};
         boid.velocity = {distribution(gen), distribution(gen)};
         boid.acceleration = {.0f, 0.f};
 
-        boid.hash_table_id = hash_table.get_cell_id(boid.position);
+        boid.hash_table_id = hash_table.put(boid.position, &boid);
+        boid_index++;
     }
 }
 
-inline float calculate_distance_squared(const Vector2 &from, const Vector2 &to) noexcept {
-    const float dx = to.x - from.x;
-    const float dy = to.y - from.y;
-    return dx * dx + dy * dy;
-}
 
 Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHeight) {
     if (pos.x < 0) pos.x = screenWidth;
@@ -60,15 +49,13 @@ wtedy separacja zależy tylko od różnicy pozycji, bez skalowania siły względ
 Możesz nie normalizować końcowego wektora,
 jeśli chcesz, by siła separacji zależała od liczby i rozkładu sąsiadów (np. tłok = silniejsze odpychanie).
 */
-void separation(const int boid_id,
-                std::array<boid, NUMBER_OF_BOIDS> &boids,
-                const std::vector<std::pair<int, float> > &neighbors_index_distance,
+void separation(Boid &boid, const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
                 float separation_range_squared, float separation_strength) {
     Vector2 separation_force = {0.0f, 0.0f};
     int separation_count = 0;
-    for (auto [n_index, dist]: neighbors_index_distance) {
+    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
         if (dist < separation_range_squared && dist > 0.0f) {
-            Vector2 diff = Vector2Subtract(boids[boid_id].position, boids[n_index].position);
+            Vector2 diff = Vector2Subtract(boid.position, neighbor_boid->position);
             diff = Vector2Normalize(diff);
             diff = Vector2Scale(diff, 1.0f / dist);
             separation_force = Vector2Add(separation_force, diff);
@@ -80,20 +67,19 @@ void separation(const int boid_id,
         separation_force = Vector2Scale(separation_force, 1.0f / static_cast<float>(separation_count));
         separation_force = Vector2Normalize(separation_force);
         separation_force = Vector2Scale(separation_force, separation_strength);
-        boids[boid_id].acceleration = Vector2Add(boids[boid_id].acceleration, separation_force);
+        boid.acceleration = Vector2Add(boid.acceleration, separation_force);
     }
 }
 
-void alignment(const int boid_id,
-               std::array<boid, NUMBER_OF_BOIDS> &boids,
-               const std::vector<std::pair<int, float> > &neighbors_index_distance,
+void alignment( Boid &boid,
+               const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
                float alignment_range_squared, float alignment_strength) {
     Vector2 alignment_force = {0.0f, 0.0f};
     int alignment_count = 0;
 
-    for (auto [n_index, dist]: neighbors_index_distance) {
+    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
         if (dist < alignment_range_squared && dist > 0.0f) {
-            alignment_force = Vector2Add(alignment_force, boids[n_index].velocity);
+            alignment_force = Vector2Add(alignment_force, neighbor_boid->velocity);
             alignment_count++;
         }
     }
@@ -102,49 +88,49 @@ void alignment(const int boid_id,
         alignment_force = Vector2Scale(alignment_force, 1.0f / static_cast<float>(alignment_count));
         alignment_force = Vector2Normalize(alignment_force);
         alignment_force = Vector2Scale(alignment_force, alignment_strength);
-        boids[boid_id].acceleration = Vector2Add(boids[boid_id].acceleration, alignment_force);
+        boid.acceleration = Vector2Add(boid.acceleration, alignment_force);
     }
 }
 
-void cohesion(const int boid_id,
-              std::array<boid, NUMBER_OF_BOIDS> &boids,
-              const std::vector<std::pair<int, float> > &neighbors_index_distance,
+void cohesion( Boid &boid,
+              const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
               float cohesion_range_squared, float cohesion_strength) {
     Vector2 center_of_mass = {0.0f, 0.0f};
     int cohesion_count = 0;
 
-    for (auto [n_index, dist]: neighbors_index_distance) {
+    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
         if (dist < cohesion_range_squared && dist > 0.0f) {
-            center_of_mass = Vector2Add(center_of_mass, boids[n_index].position);
+            center_of_mass = Vector2Add(center_of_mass, neighbor_boid->position);
             cohesion_count++;
         }
     }
 
     if (cohesion_count > 0) {
         center_of_mass = Vector2Scale(center_of_mass, 1.0f / static_cast<float>(cohesion_count));
-        Vector2 direction_to_center = Vector2Subtract(center_of_mass, boids[boid_id].position);
+        Vector2 direction_to_center = Vector2Subtract(center_of_mass, boid.position);
         direction_to_center = Vector2Normalize(direction_to_center);
         direction_to_center = Vector2Scale(direction_to_center, cohesion_strength);
-        boids[boid_id].acceleration = Vector2Add(boids[boid_id].acceleration, direction_to_center);
+        boid.acceleration = Vector2Add(boid.acceleration, direction_to_center);
     }
 }
-
 
 
 int main() {
     // Initialization
     //--------------------------------------------------------------------------------------
+    bool is_debug = false;
+
     constexpr int screenWidth = 1200;
     constexpr int screenHeight = 800;
 
-    const auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
-    std::array<boid, NUMBER_OF_BOIDS> boids{};
+    auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
+    std::array<Boid, NUMBER_OF_BOIDS> boids{};
     fill_boids(boids, screenWidth, screenHeight, hash_table);
 
 
     constexpr float separation_range = 20.0f;
-    constexpr float alignment_range = 50.0f;
-    constexpr float cohesion_range = 50.0f;
+    constexpr float alignment_range = 60.0f;
+    constexpr float cohesion_range = 60.0f;
 
     constexpr float separation_range_squared = separation_range * separation_range;
     constexpr float alignment_range_squared = alignment_range * alignment_range;
@@ -158,55 +144,49 @@ int main() {
     const float max_force = 0.20f;
 
     const float fov_angle_radians = DEG2RAD * 60.0f;
-    const int scan_range_in_cells = static_cast<int>(std::max(separation_strength, alignment_strength, cohesion_strength)/CELL_SIZE);
+    const int scan_range_in_cells = static_cast<int>(alignment_range)/CELL_SIZE;
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(screenWidth, screenHeight, "Boids");
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+
 
     // Main game loop
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         // Update
         //----------------------------------------------------------------------------------
-        for (auto boid: boids) {
-            //This is an optimization that works because fov_angle_radians <=  DEG2RAD * 90.0f
-            std::vector<int> cell_index(scan_range_in_cells * scan_range_in_cells + 1);
-            if(boid.velocity.x >= 0) {
+        int i = 0;;
+        for (auto &boid: boids) {
+            std::vector<std::vector<Boid *> > boids_in_range_candidates = hash_table.get_boids_from_cells_in_range(
+                boid.hash_table_id, scan_range_in_cells);
 
-            }
-            else{}
-            if(boid.velocity.y >= 0){}
-            else{}
+            std::vector<std::pair<Boid *, float> > neighbors_distance;
+            for (const auto &boids_in_range_candidate: boids_in_range_candidates) {
+                for (auto boid_in_range: boids_in_range_candidate) {
+                    float distance = Vector2Distance(boid.position, boid_in_range->position);
+                    if (distance > cohesion_range_squared) continue;
 
-
-
-            for (int i = 0; i < boids.size(); ++i) { }
-            std::vector<std::pair<int, float> > neighbors_index_distance;
-            neighbors_index_distance.reserve(NUMBER_OF_BOIDS);
-
-
-            if(boid)
+                    Vector2 distance_vector = Vector2Subtract(boid_in_range->position, boid.position);
+                    float angle = Vector2Angle(boid.velocity, distance_vector);
+                    if (angle > fov_angle_radians) continue;
 
 
-            for (int j = 0; j < boids.size(); j++) {
-                const float distance = calculate_distance_squared(boids[i].position, boids[j].position);
-                if (distance < cohesion_range_squared) {
-                    Vector2 distance_vector = Vector2Subtract(boids[j].position, boids[i].position);
-                    float angle = Vector2Angle(boids[i].velocity, distance_vector);
-                    if (angle < fov_angle_radians) neighbors_index_distance.emplace_back(j, distance);
+
+                    neighbors_distance.emplace_back(boid_in_range, distance);
                 }
             }
-            separation(i, boids, neighbors_index_distance, separation_range_squared, separation_strength);
-            alignment(i, boids, neighbors_index_distance, alignment_range_squared, alignment_strength);
-            cohesion(i, boids, neighbors_index_distance, cohesion_range_squared, cohesion_strength);
+
+            separation(boid, neighbors_distance, separation_range_squared, separation_strength);
+            alignment(boid, neighbors_distance, alignment_range_squared, alignment_strength);
+            cohesion(boid, neighbors_distance, cohesion_range_squared, cohesion_strength);
         }
 
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
-                const float distance = calculate_distance_squared(boid.position, m_pos);
-                if (distance < 40000.f) {
+                if (Vector2Distance(boid.position, m_pos) < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
                     boid.acceleration = Vector2Add(boid.acceleration, direction_to_center);
                 }
@@ -214,15 +194,15 @@ int main() {
         } else if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
-                const float distance = calculate_distance_squared(boid.position, m_pos);
-                if (distance < 40000.f) {
+                if (Vector2Distance(boid.position, m_pos) < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
                     boid.acceleration = Vector2Subtract(boid.acceleration, direction_to_center);
                 }
             }
         }
 
-        // teleports to other side, and adjust velocity
+        // teleports to other side, and adjust velocity]
+        hash_table.reset();
         for (auto &boid: boids) {
             if (Vector2Length(boid.acceleration) > max_force) {
                 boid.acceleration = Vector2Scale(Vector2Normalize(boid.acceleration), max_force);
@@ -239,6 +219,7 @@ int main() {
 
             boid.position.x = fmodf(boid.position.x + screenWidth, screenWidth);
             boid.position.y = fmodf(boid.position.y + screenHeight, screenHeight);
+            boid.hash_table_id = hash_table.put(boid.position, &boid);
         }
 
 
@@ -246,7 +227,31 @@ int main() {
         //----------------------------------------------------------------------------------
         BeginDrawing();
 
-        DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.12f));
+        if (is_debug) {
+            DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 1.12f));
+        }else {
+            DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.12f));
+        }
+
+
+        //Draws HashTable
+        if(is_debug) {
+            for (int i = 0; i < hash_table.max_width_cells; ++i) {
+                DrawLine(CELL_SIZE*i, 0,CELL_SIZE * i, screenHeight, WHITE);
+            }
+            for (int i = 0; i < hash_table.max_height_cells; ++i) {
+                DrawLine(0, CELL_SIZE*i,screenWidth, CELL_SIZE*i, WHITE);
+            }
+
+            for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id, scan_range_in_cells)) {
+                int x = index % hash_table.max_width_cells;
+                int y = index / hash_table.max_width_cells;
+                DrawRectangleLines(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE, YELLOW);
+            }
+
+        }
+
+
 
         for (const auto &boid: boids) {
             DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
@@ -254,6 +259,12 @@ int main() {
             // Vector2 endpoint = Vector2Add(boid.position, direction);
             // DrawLineV(boid.position, endpoint, BLACK);
         }
+
+        if(is_debug) {
+            DrawCircleLinesV(boids[0].position, alignment_range, (Color){38, 104, 106, 255});
+            DrawCircleV(boids[0].position, BOID_RADIUS, RED);
+        }
+
 
         DrawFPS(10, 10);
         EndDrawing();
