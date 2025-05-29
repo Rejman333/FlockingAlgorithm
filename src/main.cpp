@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <string>
@@ -8,7 +9,7 @@
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
 
-#define NUMBER_OF_BOIDS 1000
+#define NUMBER_OF_BOIDS 2000
 #define BOID_RADIUS 2
 #define CELL_SIZE 50
 #define MAX_NEIGHBORS 20
@@ -58,7 +59,7 @@ int main() {
     fill_boids(boids, screenWidth, screenHeight, hash_table);
 
 
-    constexpr float separation_range = 10.0f;
+    constexpr float separation_range = 15.0f;
     constexpr float alignment_range = 50.0f;
     constexpr float cohesion_range = 60.0f;
 
@@ -76,6 +77,9 @@ int main() {
     const float fov_angle_radians = DEG2RAD * 60.0f;
     const int scan_range_in_cells = std::max(static_cast<int>(alignment_range) / CELL_SIZE, 1);
 
+    std::random_device rd;
+    std::mt19937 rng(rd());
+
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(screenWidth, screenHeight, "Boids");
@@ -90,7 +94,7 @@ int main() {
         int i = 0;;
         for (auto &boid: boids) {
             std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
-
+            std::ranges::shuffle(boids_in_range, rng);
             std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
             int neighbor_count = 0;
             for (auto boid_in_range: boids_in_range) {
@@ -102,6 +106,9 @@ int main() {
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
                 float angle = Vector2Angle(boid.velocity, diff);
                 if (angle > fov_angle_radians) continue;
+
+                // float dot = Vector2DotProduct(Vector2Normalize(boid.velocity), Vector2Normalize(to_other));
+                // if (dot < cos(fov_angle)) continue;
 
                 neighbors[neighbor_count++] = {boid_in_range, dist_sqr};
                 if (neighbor_count > MAX_NEIGHBORS - 1) break;
@@ -167,10 +174,10 @@ int main() {
         //Draws HashTable
         if (is_debug) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, screenHeight, WHITE);
+                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, screenHeight, LIGHTGRAY);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
-                DrawLine(0, CELL_SIZE * i, screenWidth, CELL_SIZE * i, WHITE);
+                DrawLine(0, CELL_SIZE * i, screenWidth, CELL_SIZE * i, LIGHTGRAY);
             }
 
             for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id, scan_range_in_cells)) {
@@ -189,8 +196,8 @@ int main() {
         }
 
         if (is_debug) {
-            DrawCircleLinesV(boids[0].position, alignment_range, (Color){38, 104, 106, 255});
-            DrawCircleV(boids[0].position, BOID_RADIUS, RED);
+            DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
+            DrawCircleLinesV(boids[0].position, separation_range, GREEN);
         }
 
 
