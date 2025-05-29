@@ -8,9 +8,10 @@
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
 
-#define NUMBER_OF_BOIDS 400
+#define NUMBER_OF_BOIDS 800
 #define BOID_RADIUS 2
-#define CELL_SIZE 50
+#define CELL_SIZE 100
+#define MAX_NEIGHBORS 20
 
 
 void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
@@ -49,70 +50,7 @@ wtedy separacja zależy tylko od różnicy pozycji, bez skalowania siły względ
 Możesz nie normalizować końcowego wektora,
 jeśli chcesz, by siła separacji zależała od liczby i rozkładu sąsiadów (np. tłok = silniejsze odpychanie).
 */
-void separation(Boid &boid, const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
-                float separation_range_squared, float separation_strength) {
-    Vector2 separation_force = {0.0f, 0.0f};
-    int separation_count = 0;
-    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
-        if (dist < separation_range_squared && dist > 0.0f) {
-            Vector2 diff = Vector2Subtract(boid.position, neighbor_boid->position);
-            diff = Vector2Normalize(diff);
-            diff = Vector2Scale(diff, 1.0f / dist);
-            separation_force = Vector2Add(separation_force, diff);
-            separation_count++;
-        }
-    }
 
-    if (separation_count > 0) {
-        separation_force = Vector2Scale(separation_force, 1.0f / static_cast<float>(separation_count));
-        separation_force = Vector2Normalize(separation_force);
-        separation_force = Vector2Scale(separation_force, separation_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, separation_force);
-    }
-}
-
-void alignment( Boid &boid,
-               const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
-               float alignment_range_squared, float alignment_strength) {
-    Vector2 alignment_force = {0.0f, 0.0f};
-    int alignment_count = 0;
-
-    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
-        if (dist < alignment_range_squared && dist > 0.0f) {
-            alignment_force = Vector2Add(alignment_force, neighbor_boid->velocity);
-            alignment_count++;
-        }
-    }
-
-    if (alignment_count > 0) {
-        alignment_force = Vector2Scale(alignment_force, 1.0f / static_cast<float>(alignment_count));
-        alignment_force = Vector2Normalize(alignment_force);
-        alignment_force = Vector2Scale(alignment_force, alignment_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, alignment_force);
-    }
-}
-
-void cohesion( Boid &boid,
-              const std::vector<std::pair<Boid *, float> > &neighbors_with_distance,
-              float cohesion_range_squared, float cohesion_strength) {
-    Vector2 center_of_mass = {0.0f, 0.0f};
-    int cohesion_count = 0;
-
-    for (auto [neighbor_boid, dist]: neighbors_with_distance) {
-        if (dist < cohesion_range_squared && dist > 0.0f) {
-            center_of_mass = Vector2Add(center_of_mass, neighbor_boid->position);
-            cohesion_count++;
-        }
-    }
-
-    if (cohesion_count > 0) {
-        center_of_mass = Vector2Scale(center_of_mass, 1.0f / static_cast<float>(cohesion_count));
-        Vector2 direction_to_center = Vector2Subtract(center_of_mass, boid.position);
-        direction_to_center = Vector2Normalize(direction_to_center);
-        direction_to_center = Vector2Scale(direction_to_center, cohesion_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, direction_to_center);
-    }
-}
 
 
 int main() {
@@ -128,23 +66,23 @@ int main() {
     fill_boids(boids, screenWidth, screenHeight, hash_table);
 
 
-    constexpr float separation_range = 20.0f;
+    constexpr float separation_range = 10.0f;
     constexpr float alignment_range = 50.0f;
-    constexpr float cohesion_range = 50.0f;
+    constexpr float cohesion_range = 60.0f;
 
     constexpr float separation_range_squared = separation_range * separation_range;
     constexpr float alignment_range_squared = alignment_range * alignment_range;
     constexpr float cohesion_range_squared = cohesion_range * cohesion_range;
 
-    const float separation_strength = 0.85f;
-    const float alignment_strength = 0.8f;
+    const float separation_strength = 1.3f;
+    const float alignment_strength = 0.6f;
     const float cohesion_strength = 0.8f;
 
-    const float max_velocity = 4.0f;
-    const float max_force = 0.20f;
+    const float max_velocity = 3.5f;
+    const float max_force = 0.10f;
 
     const float fov_angle_radians = DEG2RAD * 60.0f;
-    const int scan_range_in_cells = static_cast<int>(alignment_range)/CELL_SIZE;
+    const int scan_range_in_cells = std::max(static_cast<int>(alignment_range)/CELL_SIZE, 1);
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
@@ -165,17 +103,16 @@ int main() {
             std::vector<std::pair<Boid *, float> > neighbors_distance;
             for (const auto &boids_in_range_candidate: boids_in_range_candidates) {
                 for (auto boid_in_range: boids_in_range_candidate) {
-                    float distance = Vector2Distance(boid.position, boid_in_range->position);
-                    if (distance > cohesion_range_squared) continue;
+                    float distanceSqr = Vector2DistanceSqr(boid.position, boid_in_range->position);
+                    if (distanceSqr > cohesion_range_squared) continue;
 
                     Vector2 distance_vector = Vector2Subtract(boid_in_range->position, boid.position);
                     float angle = Vector2Angle(boid.velocity, distance_vector);
                     if (angle > fov_angle_radians) continue;
 
-
-
-                    neighbors_distance.emplace_back(boid_in_range, distance);
+                    neighbors_distance.emplace_back(boid_in_range, sqrt(distanceSqr));
                 }
+                if (neighbors_distance.size() > MAX_NEIGHBORS) break;
             }
 
             separation(boid, neighbors_distance, separation_range_squared, separation_strength);
@@ -186,7 +123,7 @@ int main() {
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
-                if (Vector2Distance(boid.position, m_pos) < 40000.f) {
+                if (Vector2DistanceSqr(boid.position, m_pos) < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
                     boid.acceleration = Vector2Add(boid.acceleration, direction_to_center);
                 }
@@ -194,7 +131,7 @@ int main() {
         } else if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
-                if (Vector2Distance(boid.position, m_pos) < 40000.f) {
+                if (Vector2DistanceSqr(boid.position, m_pos) < 40000.f) {
                     Vector2 direction_to_center = Vector2Subtract(m_pos, boid.position);
                     boid.acceleration = Vector2Subtract(boid.acceleration, direction_to_center);
                 }
