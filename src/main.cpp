@@ -8,9 +8,9 @@
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
 
-#define NUMBER_OF_BOIDS 800
+#define NUMBER_OF_BOIDS 1000
 #define BOID_RADIUS 2
-#define CELL_SIZE 100
+#define CELL_SIZE 50
 #define MAX_NEIGHBORS 20
 
 
@@ -44,14 +44,6 @@ Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHe
     return pos;
 }
 
-/*
-Możesz nie normalizować pojedynczych diff wektorów,
-wtedy separacja zależy tylko od różnicy pozycji, bez skalowania siły względem odległości.
-Możesz nie normalizować końcowego wektora,
-jeśli chcesz, by siła separacji zależała od liczby i rozkładu sąsiadów (np. tłok = silniejsze odpychanie).
-*/
-
-
 
 int main() {
     // Initialization
@@ -82,7 +74,7 @@ int main() {
     const float max_force = 0.10f;
 
     const float fov_angle_radians = DEG2RAD * 60.0f;
-    const int scan_range_in_cells = std::max(static_cast<int>(alignment_range)/CELL_SIZE, 1);
+    const int scan_range_in_cells = std::max(static_cast<int>(alignment_range) / CELL_SIZE, 1);
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
@@ -97,27 +89,28 @@ int main() {
         //----------------------------------------------------------------------------------
         int i = 0;;
         for (auto &boid: boids) {
-            std::vector<std::vector<Boid *> > boids_in_range_candidates = hash_table.get_boids_from_cells_in_range(
-                boid.hash_table_id, scan_range_in_cells);
+            std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
 
-            std::vector<std::pair<Boid *, float> > neighbors_distance;
-            for (const auto &boids_in_range_candidate: boids_in_range_candidates) {
-                for (auto boid_in_range: boids_in_range_candidate) {
-                    float distanceSqr = Vector2DistanceSqr(boid.position, boid_in_range->position);
-                    if (distanceSqr > cohesion_range_squared) continue;
+            std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
+            int neighbor_count = 0;
+            for (auto boid_in_range: boids_in_range) {
+                if (boid_in_range == &boid) continue;
 
-                    Vector2 distance_vector = Vector2Subtract(boid_in_range->position, boid.position);
-                    float angle = Vector2Angle(boid.velocity, distance_vector);
-                    if (angle > fov_angle_radians) continue;
+                float dist_sqr = Vector2DistanceSqr(boid.position, boid_in_range->position);
+                if (dist_sqr > cohesion_range_squared) continue;
 
-                    neighbors_distance.emplace_back(boid_in_range, sqrt(distanceSqr));
-                }
-                if (neighbors_distance.size() > MAX_NEIGHBORS) break;
+                Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
+                float angle = Vector2Angle(boid.velocity, diff);
+                if (angle > fov_angle_radians) continue;
+
+                neighbors[neighbor_count++] = {boid_in_range, dist_sqr};
+                if (neighbor_count > MAX_NEIGHBORS - 1) break;
             }
 
-            separation(boid, neighbors_distance, separation_range_squared, separation_strength);
-            alignment(boid, neighbors_distance, alignment_range_squared, alignment_strength);
-            cohesion(boid, neighbors_distance, cohesion_range_squared, cohesion_strength);
+            apply_boid_behaviors(boid, neighbors, neighbor_count,
+                                 separation_range_squared, separation_strength,
+                                 alignment_range_squared, alignment_strength,
+                                 cohesion_range_squared, cohesion_strength);
         }
 
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -166,28 +159,26 @@ int main() {
 
         if (is_debug) {
             DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 1.12f));
-        }else {
+        } else {
             DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.12f));
         }
 
 
         //Draws HashTable
-        if(is_debug) {
+        if (is_debug) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-                DrawLine(CELL_SIZE*i, 0,CELL_SIZE * i, screenHeight, WHITE);
+                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, screenHeight, WHITE);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
-                DrawLine(0, CELL_SIZE*i,screenWidth, CELL_SIZE*i, WHITE);
+                DrawLine(0, CELL_SIZE * i, screenWidth, CELL_SIZE * i, WHITE);
             }
 
             for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id, scan_range_in_cells)) {
                 int x = index % hash_table.max_width_cells;
                 int y = index / hash_table.max_width_cells;
-                DrawRectangleLines(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE, YELLOW);
+                DrawRectangleLines(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, YELLOW);
             }
-
         }
-
 
 
         for (const auto &boid: boids) {
@@ -197,7 +188,7 @@ int main() {
             // DrawLineV(boid.position, endpoint, BLACK);
         }
 
-        if(is_debug) {
+        if (is_debug) {
             DrawCircleLinesV(boids[0].position, alignment_range, (Color){38, 104, 106, 255});
             DrawCircleV(boids[0].position, BOID_RADIUS, RED);
         }

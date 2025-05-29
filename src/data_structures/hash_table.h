@@ -38,11 +38,11 @@ public:
 
     void reset();
 
-    [[nodiscard]] std::vector<std::vector<Boid*>> get_boids_from_cells_in_range(int cell_index, int scan_range) const;
+    [[nodiscard]] std::vector<Boid *> get_boids_in_range(int cell_index, int scan_range) const;
 
     std::vector<Boid *>& get_boids_at_index(int cell_index);
 
-    std::vector<int> get_indexes_of_seen_cells(int cell_index, int scan_range) const;
+    [[nodiscard]] std::vector<int> get_indexes_of_seen_cells(int cell_index, int scan_range) const;
 
     [[nodiscard]] int get_cell_id(const Vector2 &position) const;
 

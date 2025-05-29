@@ -18,25 +18,28 @@ void HashTable::reset() {
 }
 
 
-std::vector<std::vector<Boid *> > HashTable::get_boids_from_cells_in_range(
-    const int cell_index, const int scan_range) const {
-    std::vector<std::vector<Boid *> > to_return;
-    int centrum_x_index = cell_index % max_width_cells;
-    int centrum_y_index = cell_index / max_width_cells;
+std::vector<Boid*> HashTable::get_boids_in_range(int cell_index, int scan_range) const {
+    std::vector<Boid*> result;
 
-    const int start_x = std::max(centrum_x_index - scan_range, 0);
-    const int end_x = std::min(centrum_x_index + scan_range, max_width_cells);
+    int cx = cell_index % max_width_cells;
+    int cy = cell_index / max_width_cells;
 
-    const int start_y = std::max(centrum_y_index - scan_range, 0);
-    const int end_y = std::min(centrum_y_index + scan_range, max_height_cells);
+    const int start_y = std::max(cy - scan_range, 0);
+    const int end_y = std::min(cy + scan_range, max_height_cells - 1);
+    const int start_x = std::max(cx - scan_range, 0);
+    const int end_x = std::min(cx + scan_range, max_width_cells - 1);
 
-    for (int i = start_x; i <= end_x; ++i) {
-        for (int j = start_y; j < end_y; ++j) {
-            to_return.push_back(cells[i + j * max_width_cells]);
+    // opcjonalnie: prealokuj na oko
+    result.reserve((end_x - start_x + 1) * (end_y - start_y + 1) * 5);
+    for (int y = start_y; y <= end_y; ++y) {
+        for (int x = start_x; x <= end_x; ++x) {
+            int index = x + y * max_width_cells;
+            const auto& cell = cells[index];
+            result.insert(result.end(), cell.begin(), cell.end());
         }
     }
 
-    return to_return;
+    return result;
 }
 
 std::vector<Boid *> &HashTable::get_boids_at_index(const int cell_index) {
@@ -44,21 +47,23 @@ std::vector<Boid *> &HashTable::get_boids_at_index(const int cell_index) {
 }
 
 std::vector<int> HashTable::get_indexes_of_seen_cells(const int cell_index, const int scan_range) const {
-        std::vector<int> to_return;
-        int centrum_x_index = cell_index % max_width_cells;
-        int centrum_y_index = cell_index / max_width_cells;
+    std::vector<int> result;
+    result.reserve((2 * scan_range + 1) * (2 * scan_range + 1));
 
-        const int start_x = std::max(centrum_x_index - scan_range, 0);
-        const int end_x = std::min(centrum_x_index + scan_range, max_width_cells);
+    const int cx = cell_index % max_width_cells;
+    const int cy = cell_index / max_width_cells;
 
-        const int start_y = std::max(centrum_y_index - scan_range, 0);
-        const int end_y = std::min(centrum_y_index + scan_range, max_height_cells);
+    const int start_y = std::max(cy - scan_range, 0);
+    const int end_y = std::min(cy + scan_range, max_height_cells - 1);
+    const int start_x = std::max(cx - scan_range, 0);
+    const int end_x = std::min(cx + scan_range, max_width_cells - 1);
 
-        for (int i = start_x; i <= end_x; ++i) {
-            for (int j = start_y; j <= end_y; ++j) {
-                to_return.push_back(i + j * max_width_cells);
-            }
+    for (int y = start_y; y <= end_y; ++y) {
+        const int row_offset = y * max_width_cells;
+        for (int x = start_x; x <= end_x; ++x) {
+            result.push_back(row_offset + x);
         }
+    }
 
-        return to_return;
+    return result;
 }
