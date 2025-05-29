@@ -8,8 +8,8 @@
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
 
-#define NUMBER_OF_BOIDS 200
-#define BOID_RADIUS 5
+#define NUMBER_OF_BOIDS 400
+#define BOID_RADIUS 2
 #define CELL_SIZE 50
 
 
@@ -129,8 +129,8 @@ int main() {
 
 
     constexpr float separation_range = 20.0f;
-    constexpr float alignment_range = 60.0f;
-    constexpr float cohesion_range = 60.0f;
+    constexpr float alignment_range = 50.0f;
+    constexpr float cohesion_range = 50.0f;
 
     constexpr float separation_range_squared = separation_range * separation_range;
     constexpr float alignment_range_squared = alignment_range * alignment_range;
