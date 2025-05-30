@@ -176,6 +176,7 @@ public:
             southwest->draw(new_thickness);
         }
     }
+
     void draw_t(const Vector2 &center, const float radius, float line_thickness) const {
         float new_thickness = std::max(line_thickness - 1, 1.f);
         if (divided) {

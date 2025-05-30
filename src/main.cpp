@@ -75,7 +75,7 @@ int main() {
     // Initialization
     //--------------------------------------------------------------------------------------
     bool is_debug = false;
-    bool is_debug_q = false;
+    bool is_debug_q = true;
 
     constexpr int screenWidth = 1200;
     constexpr int screenHeight = 800;
