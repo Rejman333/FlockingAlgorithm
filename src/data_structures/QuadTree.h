@@ -40,7 +40,27 @@ public:
         }
     }
 
-    void insert(const Boid *p_boid) {
+    void reset() {
+        if (northeast) {
+            delete northeast;
+            northeast = nullptr;
+        }
+        if (northwest) {
+            delete northwest;
+            northwest = nullptr;
+        }
+        if (southeast) {
+            delete southeast;
+            southeast = nullptr;
+        }
+        if (southwest) {
+            delete southwest;
+            southwest = nullptr;
+        }
+        divided = false;
+    }
+
+    void insert(Boid *p_boid) {
         if (!divided) {
             if (number_of_elements >= MAX_CAPACITY) {
                 subdivide();
@@ -75,24 +95,25 @@ public:
         float x = boundary.x;
         float y = boundary.y;
 
-        // NE: prawa góra
-        Rectangle neRect(x + halfWidth / 2.0f, y - halfHeight / 2.0f, halfWidth, halfHeight);
-        northeast = new QuadTree(neRect);
-
         // NW: lewa góra
-        Rectangle nwRect(x - halfWidth / 2.0f, y - halfHeight / 2.0f, halfWidth, halfHeight);
+        Rectangle nwRect = {x, y, halfWidth, halfHeight};
         northwest = new QuadTree(nwRect);
 
-        // SE: prawa dół
-        Rectangle seRect(x + halfWidth / 2.0f, y + halfHeight / 2.0f, halfWidth, halfHeight);
-        southeast = new QuadTree(seRect);
+        // NE: prawa góra
+        Rectangle neRect = {x + halfWidth, y, halfWidth, halfHeight};
+        northeast = new QuadTree(neRect);
 
         // SW: lewa dół
-        Rectangle swRect(x - halfWidth / 2.0f, y + halfHeight / 2.0f, halfWidth, halfHeight);
+        Rectangle swRect = {x, y + halfHeight, halfWidth, halfHeight};
         southwest = new QuadTree(swRect);
 
+        // SE: prawa dół
+        Rectangle seRect = {x + halfWidth, y + halfHeight, halfWidth, halfHeight};
+        southeast = new QuadTree(seRect);
+
+
         for (int i = 0; i < number_of_elements; ++i) {
-            const Boid *boid = elements[i];
+            Boid *boid = elements[i];
             if (CheckCollisionPointRec(boid->position, northeast->boundary)) {
                 northeast->insert(boid);
             } else if (CheckCollisionPointRec(boid->position, northwest->boundary)) {
@@ -137,5 +158,44 @@ public:
             }
         }
         return neighbors;
+    }
+
+    void draw(float line_thickness) const {
+        DrawRectangleLinesEx(boundary,line_thickness, DARKGRAY);
+        float new_thickness = std::max(line_thickness - 1, 1.f);
+        if (northeast) {
+            northeast->draw(new_thickness);
+        }
+        if (northwest) {
+            northwest->draw(new_thickness);
+        }
+        if (southeast) {
+            southeast->draw(new_thickness);
+        }
+        if (southwest) {
+            southwest->draw(new_thickness);
+        }
+    }
+    void draw_t(const Vector2 &center, const float radius, float line_thickness) const {
+        float new_thickness = std::max(line_thickness - 1, 1.f);
+        if (divided) {
+            if (CheckCollisionCircleRec(center, radius, northeast->boundary)) {
+                northeast->draw_t(center, radius,new_thickness);
+
+            }
+            if (CheckCollisionCircleRec(center, radius, northwest->boundary)) {
+                northwest->draw_t(center, radius,new_thickness);
+
+            }
+            if (CheckCollisionCircleRec(center, radius, southeast->boundary)) {
+                southeast->draw_t(center, radius,new_thickness);
+
+            }
+            if (CheckCollisionCircleRec(center, radius, southwest->boundary)) {
+                southwest->draw_t(center, radius, new_thickness);
+            }
+        }else {
+            DrawRectangleLinesEx(boundary,line_thickness, YELLOW);
+        }
     }
 };

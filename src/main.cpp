@@ -8,12 +8,19 @@
 #include "raymath.h"
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
+#include "data_structures/QuadTree.h"
 
-#define NUMBER_OF_BOIDS 2000
+#define NUMBER_OF_BOIDS 1000
 #define BOID_RADIUS 2
 #define CELL_SIZE 50
 #define MAX_NEIGHBORS 20
 
+
+enum METHOD {
+    HASH_TABLE,
+    QUAD_TREE,
+    BRUT_FORCE,
+};
 
 void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
                 HashTable &hash_table) {
@@ -34,6 +41,24 @@ void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth,
     }
 }
 
+template<int MAX_BOIDS>
+void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
+                QuadTree<MAX_BOIDS> &quad_tree) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
+    std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
+    std::uniform_real_distribution distribution(-5.0f, 5.0f);
+
+    for (auto &boid: boids) {
+        boid.position = {distribution_x(gen), distribution_y(gen)};
+        boid.velocity = {distribution(gen), distribution(gen)};
+        boid.acceleration = {.0f, 0.f};
+
+        quad_tree.insert(boid);
+    }
+}
+
 
 Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHeight) {
     if (pos.x < 0) pos.x = screenWidth;
@@ -50,11 +75,18 @@ int main() {
     // Initialization
     //--------------------------------------------------------------------------------------
     bool is_debug = false;
+    bool is_debug_q = false;
 
     constexpr int screenWidth = 1200;
     constexpr int screenHeight = 800;
 
     auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
+    auto quad_tree = QuadTree<10>(Rectangle({
+        0,0,
+        static_cast<float>(screenWidth),
+        static_cast<float>(screenHeight)
+    }));
+
     std::array<Boid, NUMBER_OF_BOIDS> boids{};
     fill_boids(boids, screenWidth, screenHeight, hash_table);
 
@@ -83,17 +115,18 @@ int main() {
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(screenWidth, screenHeight, "Boids");
-    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);
 
 
-    // Main game loop
-    while (!WindowShouldClose()) // Detect window close button or ESC key
+    while (!WindowShouldClose())
     {
         // Update
         //----------------------------------------------------------------------------------
         int i = 0;;
         for (auto &boid: boids) {
-            std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
+            //std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
+            std::vector<Boid *> boids_in_range = quad_tree.query(boid.position, cohesion_range);
+
             std::ranges::shuffle(boids_in_range, rng);
             std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
             int neighbor_count = 0;
@@ -106,9 +139,6 @@ int main() {
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
                 float angle = Vector2Angle(boid.velocity, diff);
                 if (angle > fov_angle_radians) continue;
-
-                // float dot = Vector2DotProduct(Vector2Normalize(boid.velocity), Vector2Normalize(to_other));
-                // if (dot < cos(fov_angle)) continue;
 
                 neighbors[neighbor_count++] = {boid_in_range, dist_sqr};
                 if (neighbor_count > MAX_NEIGHBORS - 1) break;
@@ -139,7 +169,8 @@ int main() {
         }
 
         // teleports to other side, and adjust velocity]
-        hash_table.reset();
+        //hash_table.reset();
+        quad_tree.reset();
         for (auto &boid: boids) {
             if (Vector2Length(boid.acceleration) > max_force) {
                 boid.acceleration = Vector2Scale(Vector2Normalize(boid.acceleration), max_force);
@@ -156,7 +187,10 @@ int main() {
 
             boid.position.x = fmodf(boid.position.x + screenWidth, screenWidth);
             boid.position.y = fmodf(boid.position.y + screenHeight, screenHeight);
-            boid.hash_table_id = hash_table.put(boid.position, &boid);
+
+
+            //boid.hash_table_id = hash_table.put(boid.position, &boid);
+            quad_tree.insert(&boid);
         }
 
 
@@ -164,7 +198,7 @@ int main() {
         //----------------------------------------------------------------------------------
         BeginDrawing();
 
-        if (is_debug) {
+        if (is_debug || is_debug_q) {
             DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 1.12f));
         } else {
             DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.12f));
@@ -198,6 +232,18 @@ int main() {
         if (is_debug) {
             DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
             DrawCircleLinesV(boids[0].position, separation_range, GREEN);
+        }
+
+        if(is_debug_q) {
+            quad_tree.draw(5);
+        }
+
+        if(is_debug_q) {
+            quad_tree.draw_t(boids[0].position,cohesion_range,3);
+            DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
+            DrawCircleLinesV(boids[0].position, separation_range, GREEN);
+            DrawCircleV(boids[0].position, BOID_RADIUS, RED);
+
         }
 
 
