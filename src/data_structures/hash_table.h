@@ -7,20 +7,22 @@
 
 
 class HashTable {
-    std::vector<std::vector<Boid*> > cells;
+    std::vector<std::vector<Boid *> > cells;
 
 public:
     int cell_size;
     int max_width_cells;
     int max_height_cells;
     int number_of_buckets;
+    int scan_range;
 
 
-    HashTable(): cells(std::vector<std::vector<Boid*> >(0)), cell_size(0), max_width_cells(0), max_height_cells(0),
-                 number_of_buckets(0) {
+    HashTable(): cells(std::vector<std::vector<Boid *> >(0)), cell_size(0), max_width_cells(0), max_height_cells(0),
+                 number_of_buckets(0), scan_range(0) {
     };
 
-    HashTable(const int space_width, const int space_height, const int cell_size): cell_size(cell_size) {
+    HashTable(const int space_width, const int space_height, const int cell_size, int scan_range): cell_size(cell_size),
+        scan_range(scan_range) {
         if (space_width <= 0 || space_height <= 0 || cell_size <= 0)
             throw std::invalid_argument(
                 "Width, height and cell size must be positive integers.");
@@ -38,12 +40,11 @@ public:
 
     void reset();
 
-    [[nodiscard]] std::vector<Boid *> get_boids_in_range(int cell_index, int scan_range) const;
+    [[nodiscard]] std::vector<Boid *> get_boids_in_range(int cell_index) const;
 
-    std::vector<Boid *>& get_boids_at_index(int cell_index);
+    std::vector<Boid *> &get_boids_at_index(int cell_index);
 
-    [[nodiscard]] std::vector<int> get_indexes_of_seen_cells(int cell_index, int scan_range) const;
+    [[nodiscard]] std::vector<int> get_indexes_of_seen_cells(int cell_index) const;
 
     [[nodiscard]] int get_cell_id(const Vector2 &position) const;
-
 };

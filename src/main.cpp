@@ -17,10 +17,91 @@
 
 
 enum METHOD {
-    HASH_TABLE,
-    QUAD_TREE,
-    BRUT_FORCE,
+    HASH,
+    TREE,
+    FORCE,
 };
+
+struct SimulationConfig {
+    int width = 1200;
+    int height = 800;
+    int boid_count = 200;
+    bool debug_mode = false;
+    METHOD method = HASH;
+
+    float separation_range = 15.0f;
+    float alignment_range = 50.0f;
+    float cohesion_range = 60.0f;
+
+    float separation_range_squared = separation_range * separation_range;
+    float alignment_range_squared = alignment_range * alignment_range;
+    float cohesion_range_squared = cohesion_range * cohesion_range;
+
+    float separation_strength = 1.3f;
+    float alignment_strength = 0.6f;
+    float cohesion_strength = 0.8f;
+
+    float max_velocity = 3.5f;
+    float max_force = 0.10f;
+
+    float fov_angle_radians = 60.0f * DEG2RAD;
+
+    int cell_size = 50;
+    int max_boids_in_tree = 10;
+};
+
+
+METHOD parse_method(const std::string &str) {
+    if (str == "hash") return HASH;
+    if (str == "qtree") return TREE;
+    if (str == "brute") return FORCE;
+    throw std::runtime_error("Unknown method: " + str);
+}
+
+void parse_args(int argc, char *argv[], SimulationConfig &config) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-width" && i + 1 < argc) {
+            config.width = std::stoi(argv[++i]);
+        } else if (arg == "-height" && i + 1 < argc) {
+            config.height = std::stoi(argv[++i]);
+        } else if (arg == "-boids" && i + 1 < argc) {
+            config.boid_count = std::stoi(argv[++i]);
+        } else if (arg == "-method" && i + 1 < argc) {
+            config.method = parse_method(argv[++i]);
+        } else if (arg == "-debug") {
+            config.debug_mode = true;
+        } else if (arg == "-sep_range" && i + 1 < argc) {
+            config.separation_range = std::stof(argv[++i]);
+            config.separation_range_squared = config.separation_range * config.separation_range;
+        } else if (arg == "-ali_range" && i + 1 < argc) {
+            config.alignment_range = std::stof(argv[++i]);
+            config.alignment_range_squared = config.alignment_range * config.alignment_range;
+        } else if (arg == "-coh_range" && i + 1 < argc) {
+            config.cohesion_range = std::stof(argv[++i]);
+            config.cohesion_range_squared = config.cohesion_range * config.cohesion_range;
+        } else if (arg == "-sep_str" && i + 1 < argc) {
+            config.separation_strength = std::stof(argv[++i]);
+        } else if (arg == "-ali_str" && i + 1 < argc) {
+            config.alignment_strength = std::stof(argv[++i]);
+        } else if (arg == "-coh_str" && i + 1 < argc) {
+            config.cohesion_strength = std::stof(argv[++i]);
+        } else if (arg == "-max_vel" && i + 1 < argc) {
+            config.max_velocity = std::stof(argv[++i]);
+        } else if (arg == "-max_force" && i + 1 < argc) {
+            config.max_force = std::stof(argv[++i]);
+        } else if (arg == "-fov" && i + 1 < argc) {
+            config.fov_angle_radians = std::stof(argv[++i]) * DEG2RAD;
+        } else if (arg == "-cellsize" && i + 1 < argc) {
+            config.cell_size = std::stoi(argv[++i]);
+        } else if (arg == "-maxtree" && i + 1 < argc) {
+            config.max_boids_in_tree = std::stoi(argv[++i]);
+        } else {
+            std::cerr << "Nieznany argument: " << arg << "\n";
+        }
+    }
+}
+
 
 void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
                 HashTable &hash_table) {
@@ -71,83 +152,79 @@ Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHe
 }
 
 
-int main() {
+int main(int argc, char *argv[]) {
     // Initialization
     //--------------------------------------------------------------------------------------
-    bool is_debug = false;
-    bool is_debug_q = true;
+    SimulationConfig config;
+    parse_args(argc, argv, config);
 
-    constexpr int screenWidth = 1200;
-    constexpr int screenHeight = 800;
 
-    auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
+    //TODO set it to max of ranges
+    const int scan_range = std::max(static_cast<int>(config.alignment_range) / CELL_SIZE, 1);
+    auto hash_table = HashTable(config.width, config.height,CELL_SIZE, scan_range);
     auto quad_tree = QuadTree<10>(Rectangle({
-        0,0,
-        static_cast<float>(screenWidth),
-        static_cast<float>(screenHeight)
+        0, 0,
+        static_cast<float>(config.width),
+        static_cast<float>(config.height)
     }));
 
     std::array<Boid, NUMBER_OF_BOIDS> boids{};
-    fill_boids(boids, screenWidth, screenHeight, hash_table);
+    fill_boids(boids, config.width, config.height, hash_table);
 
 
-    constexpr float separation_range = 15.0f;
-    constexpr float alignment_range = 50.0f;
-    constexpr float cohesion_range = 60.0f;
-
-    constexpr float separation_range_squared = separation_range * separation_range;
-    constexpr float alignment_range_squared = alignment_range * alignment_range;
-    constexpr float cohesion_range_squared = cohesion_range * cohesion_range;
-
-    const float separation_strength = 1.3f;
-    const float alignment_strength = 0.6f;
-    const float cohesion_strength = 0.8f;
-
-    const float max_velocity = 3.5f;
-    const float max_force = 0.10f;
-
-    const float fov_angle_radians = DEG2RAD * 60.0f;
-    const int scan_range_in_cells = std::max(static_cast<int>(alignment_range) / CELL_SIZE, 1);
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
+    InitWindow(config.width, config.height, "Boids");
+    SetTargetFPS(60);
 
     std::random_device rd;
     std::mt19937 rng(rd());
 
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
-    InitWindow(screenWidth, screenHeight, "Boids");
-    SetTargetFPS(60);
 
-
-    while (!WindowShouldClose())
-    {
+    while (!WindowShouldClose()) {
         // Update
         //----------------------------------------------------------------------------------
         int i = 0;;
         for (auto &boid: boids) {
-            //std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
-            std::vector<Boid *> boids_in_range = quad_tree.query(boid.position, cohesion_range);
-
-            std::ranges::shuffle(boids_in_range, rng);
+            std::vector<Boid *> boids_in_range;
             std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
             int neighbor_count = 0;
+
+            switch (config.method) {
+                case HASH:
+                    boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id);
+                    break;
+                case TREE:
+                    boids_in_range = quad_tree.query(boid.position, config.cohesion_range);
+                    break;
+                case FORCE:
+                    return 1;
+                    break;
+
+                default:
+                    boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id);
+            }
+
+            std::ranges::shuffle(boids_in_range, rng);
+
             for (auto boid_in_range: boids_in_range) {
                 if (boid_in_range == &boid) continue;
 
                 float dist_sqr = Vector2DistanceSqr(boid.position, boid_in_range->position);
-                if (dist_sqr > cohesion_range_squared) continue;
+                if (dist_sqr > config.cohesion_range_squared) continue;
 
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
                 float angle = Vector2Angle(boid.velocity, diff);
-                if (angle > fov_angle_radians) continue;
+                if (angle > config.fov_angle_radians) continue;
 
                 neighbors[neighbor_count++] = {boid_in_range, dist_sqr};
                 if (neighbor_count > MAX_NEIGHBORS - 1) break;
             }
 
             apply_boid_behaviors(boid, neighbors, neighbor_count,
-                                 separation_range_squared, separation_strength,
-                                 alignment_range_squared, alignment_strength,
-                                 cohesion_range_squared, cohesion_strength);
+                                 config.separation_range_squared, config.separation_strength,
+                                 config.alignment_range_squared, config.alignment_strength,
+                                 config.cohesion_range_squared, config.cohesion_strength);
         }
 
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -168,84 +245,78 @@ int main() {
             }
         }
 
-        // teleports to other side, and adjust velocity]
-        //hash_table.reset();
+        //Clear Data Structures
+        hash_table.reset();
         quad_tree.reset();
+
+
         for (auto &boid: boids) {
-            if (Vector2Length(boid.acceleration) > max_force) {
-                boid.acceleration = Vector2Scale(Vector2Normalize(boid.acceleration), max_force);
+            if (Vector2Length(boid.acceleration) > config.max_force) {
+                boid.acceleration = Vector2Scale(Vector2Normalize(boid.acceleration), config.max_force);
             }
 
             boid.velocity = Vector2Add(boid.velocity, boid.acceleration);
-            if (Vector2Length(boid.velocity) > max_velocity) {
-                boid.velocity = Vector2Scale(Vector2Normalize(boid.velocity), max_velocity);
+            if (Vector2Length(boid.velocity) > config.max_velocity) {
+                boid.velocity = Vector2Scale(Vector2Normalize(boid.velocity), config.max_velocity);
             }
 
             boid.position = Vector2Add(boid.position, boid.velocity);
             boid.acceleration = {0.0f, 0.0f}; // reset
 
 
-            boid.position.x = fmodf(boid.position.x + screenWidth, screenWidth);
-            boid.position.y = fmodf(boid.position.y + screenHeight, screenHeight);
+            boid.position.x = fmodf(boid.position.x + static_cast<float>(config.width),
+                                    static_cast<float>(config.width));
+            boid.position.y = fmodf(boid.position.y + static_cast<float>(config.height),
+                                    static_cast<float>(config.height));
 
 
-            //boid.hash_table_id = hash_table.put(boid.position, &boid);
-            quad_tree.insert(&boid);
+            //rebuild datastructures
+            if (config.method == TREE) {
+                quad_tree.insert(&boid);
+            } else if (config.method == HASH) {
+                boid.hash_table_id = hash_table.put(boid.position, &boid);
+            }
         }
 
 
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
+        if(config.debug_mode) {
+            DrawRectangle(0, 0, config.width, config.height, Fade(BLACK, 1.12f));
+        }else {
+            DrawRectangle(0, 0, config.width, config.width, Fade(BLACK, 0.12f));
+        }
 
-        if (is_debug || is_debug_q) {
-            DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 1.12f));
-        } else {
-            DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.12f));
+        for (const auto &boid: boids) {
+            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
         }
 
 
         //Draws HashTable
-        if (is_debug) {
+        if (config.debug_mode && config.method == HASH) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, screenHeight, LIGHTGRAY);
+                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, config.height, LIGHTGRAY);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
-                DrawLine(0, CELL_SIZE * i, screenWidth, CELL_SIZE * i, LIGHTGRAY);
+                DrawLine(0, CELL_SIZE * i, config.width, CELL_SIZE * i, LIGHTGRAY);
             }
-
-            for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id, scan_range_in_cells)) {
+            for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id)) {
                 int x = index % hash_table.max_width_cells;
                 int y = index / hash_table.max_width_cells;
                 DrawRectangleLines(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, YELLOW);
             }
         }
-
-
-        for (const auto &boid: boids) {
-            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
-            // Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
-            // Vector2 endpoint = Vector2Add(boid.position, direction);
-            // DrawLineV(boid.position, endpoint, BLACK);
-        }
-
-        if (is_debug) {
-            DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
-            DrawCircleLinesV(boids[0].position, separation_range, GREEN);
-        }
-
-        if(is_debug_q) {
+        if (config.debug_mode && config.method == TREE) {
             quad_tree.draw(5);
+            quad_tree.draw_t(boids[0].position, config.cohesion_range, 3);
         }
 
-        if(is_debug_q) {
-            quad_tree.draw_t(boids[0].position,cohesion_range,3);
-            DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
-            DrawCircleLinesV(boids[0].position, separation_range, GREEN);
+        if (config.debug_mode) {
             DrawCircleV(boids[0].position, BOID_RADIUS, RED);
-
+            DrawCircleLinesV(boids[0].position, config.alignment_range, GREEN);
+            DrawCircleLinesV(boids[0].position, config.separation_range, GREEN);
         }
-
 
         DrawFPS(10, 10);
         EndDrawing();
