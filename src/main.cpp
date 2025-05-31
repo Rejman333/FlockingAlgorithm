@@ -25,7 +25,7 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 200;
+    int boid_count = 5000;
     bool debug_mode = false;
     METHOD method = HASH;
 
@@ -102,45 +102,6 @@ void parse_args(int argc, char *argv[], SimulationConfig &config) {
     }
 }
 
-
-void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
-                HashTable &hash_table) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
-    std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
-    std::uniform_real_distribution distribution(-5.0f, 5.0f);
-
-    int boid_index = 0;
-    for (auto &boid: boids) {
-        boid.position = {distribution_x(gen), distribution_y(gen)};
-        boid.velocity = {distribution(gen), distribution(gen)};
-        boid.acceleration = {.0f, 0.f};
-
-        boid.hash_table_id = hash_table.put(boid.position, &boid);
-        boid_index++;
-    }
-}
-
-template<int MAX_BOIDS>
-void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
-                QuadTree<MAX_BOIDS> &quad_tree) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
-    std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
-    std::uniform_real_distribution distribution(-5.0f, 5.0f);
-
-    for (auto &boid: boids) {
-        boid.position = {distribution_x(gen), distribution_y(gen)};
-        boid.velocity = {distribution(gen), distribution(gen)};
-        boid.acceleration = {.0f, 0.f};
-
-        quad_tree.insert(boid);
-    }
-}
-
-
 Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHeight) {
     if (pos.x < 0) pos.x = screenWidth;
     else if (pos.x > screenWidth) pos.x = 0;
@@ -158,6 +119,13 @@ int main(int argc, char *argv[]) {
     SimulationConfig config;
     parse_args(argc, argv, config);
 
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
+    InitWindow(config.width, config.height, "Boids");
+    SetTargetFPS(60);
+
+    std::random_device rd;
+    std::mt19937 rng(rd());
 
     //TODO set it to max of ranges
     const int scan_range = std::max(static_cast<int>(config.alignment_range) / CELL_SIZE, 1);
@@ -168,23 +136,26 @@ int main(int argc, char *argv[]) {
         static_cast<float>(config.height)
     }));
 
-    std::array<Boid, NUMBER_OF_BOIDS> boids{};
-    fill_boids(boids, config.width, config.height, hash_table);
+    std::vector<Boid> boids = fill_boids(config.boid_count, config.width, config.height);
+    std::vector<std::pair<Boid *, float>> neighbors(config.boid_count);
+    switch (config.method) {
+        case HASH:
+            hash_table.build(boids);
+            break;
+        case TREE:
+            quad_tree.build(boids);
+            break;
+        case FORCE:
+            return 1;
+            break;
 
-
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
-    InitWindow(config.width, config.height, "Boids");
-    SetTargetFPS(60);
-
-    std::random_device rd;
-    std::mt19937 rng(rd());
-
+        default:
+            hash_table.build(boids);
+    }
 
     while (!WindowShouldClose()) {
         // Update
         //----------------------------------------------------------------------------------
-        int i = 0;;
         for (auto &boid: boids) {
             std::vector<Boid *> boids_in_range;
             std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
@@ -282,9 +253,9 @@ int main(int argc, char *argv[]) {
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
-        if(config.debug_mode) {
+        if (config.debug_mode) {
             DrawRectangle(0, 0, config.width, config.height, Fade(BLACK, 1.12f));
-        }else {
+        } else {
             DrawRectangle(0, 0, config.width, config.width, Fade(BLACK, 0.12f));
         }
 

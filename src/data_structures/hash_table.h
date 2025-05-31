@@ -36,6 +36,13 @@ public:
         }
     }
 
+
+    void build(std::vector<Boid>& boids) {
+        for (auto boid: boids) {
+            boid.hash_table_id = put(boid.position, &boid);
+        }
+    }
+
     int put(const Vector2 &position, Boid *p_boid);
 
     void reset();

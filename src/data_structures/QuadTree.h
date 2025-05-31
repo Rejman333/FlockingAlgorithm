@@ -21,6 +21,12 @@ public:
     explicit QuadTree(const Rectangle boundary): boundary(boundary) {
     };
 
+    void build(std::vector<Boid> &boids) {
+        for (auto &boid: boids) {
+            insert(&boid);
+        }
+    }
+
     ~QuadTree() {
         if (northeast) {
             delete northeast;
@@ -161,7 +167,7 @@ public:
     }
 
     void draw(float line_thickness) const {
-        DrawRectangleLinesEx(boundary,line_thickness, DARKGRAY);
+        DrawRectangleLinesEx(boundary, line_thickness, DARKGRAY);
         float new_thickness = std::max(line_thickness - 1, 1.f);
         if (northeast) {
             northeast->draw(new_thickness);
@@ -181,22 +187,19 @@ public:
         float new_thickness = std::max(line_thickness - 1, 1.f);
         if (divided) {
             if (CheckCollisionCircleRec(center, radius, northeast->boundary)) {
-                northeast->draw_t(center, radius,new_thickness);
-
+                northeast->draw_t(center, radius, new_thickness);
             }
             if (CheckCollisionCircleRec(center, radius, northwest->boundary)) {
-                northwest->draw_t(center, radius,new_thickness);
-
+                northwest->draw_t(center, radius, new_thickness);
             }
             if (CheckCollisionCircleRec(center, radius, southeast->boundary)) {
-                southeast->draw_t(center, radius,new_thickness);
-
+                southeast->draw_t(center, radius, new_thickness);
             }
             if (CheckCollisionCircleRec(center, radius, southwest->boundary)) {
                 southwest->draw_t(center, radius, new_thickness);
             }
-        }else {
-            DrawRectangleLinesEx(boundary,line_thickness, YELLOW);
+        } else {
+            DrawRectangleLinesEx(boundary, line_thickness, YELLOW);
         }
     }
 };

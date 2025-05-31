@@ -1,10 +1,10 @@
 #pragma once
 
 #include <vector>
+#include <random>
 
 #include "raylib.h"
 #include "raymath.h"
-
 
 
 struct Boid {
@@ -15,54 +15,6 @@ struct Boid {
     int hash_table_id;
 };
 
-template<size_t N>
-void apply_boid_behaviors(
-    Boid &boid,
-    const std::array<std::pair<Boid *, float>, N> &neighbors,
-    int neighbor_count,
-    float sep_range_sqr, float sep_strength,
-    float ali_range_sqr, float ali_strength,
-    float coh_range_sqr, float coh_strength) {
-    Vector2 sep_force = {}, ali_force = {}, coh_center = {};
-    int sep_count = 0, ali_count = 0, coh_count = 0;
+void apply_boid_behaviors();
 
-    for (int i = 0; i < neighbor_count; ++i) {
-        const Boid* other = neighbors[i].first;
-        const float dist_sqr = neighbors[i].second;
-
-        Vector2 diff = Vector2Subtract(boid.position, other->position);
-
-        if (dist_sqr < sep_range_sqr && dist_sqr > 0.01f) {
-            sep_force = Vector2Add(sep_force, Vector2Normalize(diff));
-            sep_count++;
-        }
-
-        if (dist_sqr < ali_range_sqr) {
-            ali_force = Vector2Add(ali_force, other->velocity);
-            ali_count++;
-        }
-
-        if (dist_sqr < coh_range_sqr) {
-            coh_center = Vector2Add(coh_center, other->position);
-            coh_count++;
-        }
-    }
-
-    if (sep_count > 0) {
-        sep_force = Vector2Scale(Vector2Normalize(sep_force), sep_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, sep_force);
-    }
-
-    if (ali_count > 0) {
-        ali_force = Vector2Scale(ali_force, 1.0f / ali_count);
-        ali_force = Vector2Scale(Vector2Normalize(ali_force), ali_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, ali_force);
-    }
-
-    if (coh_count > 0) {
-        coh_center = Vector2Scale(coh_center, 1.0f / coh_count);
-        Vector2 to_center = Vector2Subtract(coh_center, boid.position);
-        to_center = Vector2Scale(Vector2Normalize(to_center), coh_strength);
-        boid.acceleration = Vector2Add(boid.acceleration, to_center);
-    }
-}
+std::vector<Boid> fill_boids(size_t boids_number, int screenWidth, int screenHeight);
