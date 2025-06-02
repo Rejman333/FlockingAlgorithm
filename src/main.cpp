@@ -10,10 +10,7 @@
 #include "data_structures/Boid.h"
 #include "data_structures/QuadTree.h"
 
-#define NUMBER_OF_BOIDS 1000
 #define BOID_RADIUS 2
-#define CELL_SIZE 50
-#define MAX_NEIGHBORS 20
 
 
 enum METHOD {
@@ -48,6 +45,8 @@ struct SimulationConfig {
 
     int cell_size = 50;
     int max_boids_in_tree = 10;
+
+    int max_neighbors = 20;
 };
 
 
@@ -92,12 +91,14 @@ void parse_args(int argc, char *argv[], SimulationConfig &config) {
             config.max_force = std::stof(argv[++i]);
         } else if (arg == "-fov" && i + 1 < argc) {
             config.fov_angle_radians = std::stof(argv[++i]) * DEG2RAD;
-        } else if (arg == "-cellsize" && i + 1 < argc) {
+        } else if (arg == "-cell_size" && i + 1 < argc) {
             config.cell_size = std::stoi(argv[++i]);
-        } else if (arg == "-maxtree" && i + 1 < argc) {
+        } else if (arg == "-max_tree" && i + 1 < argc) {
             config.max_boids_in_tree = std::stoi(argv[++i]);
+        } else if (arg == "-max_neighbors" && i + 1 < argc) {
+            config.max_neighbors = std::stoi(argv[++i]);
         } else {
-            std::cerr << "Nieznany argument: " << arg << "\n";
+            std::cerr << "Unknown argument: " << arg << "\n";
         }
     }
 }
@@ -128,8 +129,8 @@ int main(int argc, char *argv[]) {
     std::mt19937 rng(rd());
 
     //TODO set it to max of ranges
-    const int scan_range = std::max(static_cast<int>(config.alignment_range) / CELL_SIZE, 1);
-    auto hash_table = HashTable(config.width, config.height,CELL_SIZE, scan_range);
+    const int scan_range = std::max(static_cast<int>(config.alignment_range) / config.cell_size, 1);
+    auto hash_table = HashTable(config.width, config.height, config.cell_size, scan_range);
     auto quad_tree = QuadTree<10>(Rectangle({
         0, 0,
         static_cast<float>(config.width),
@@ -137,7 +138,7 @@ int main(int argc, char *argv[]) {
     }));
 
     std::vector<Boid> boids = fill_boids(config.boid_count, config.width, config.height);
-    std::vector<std::pair<Boid *, float>> neighbors(config.boid_count);
+    std::vector<std::pair<Boid *, float> > neighbors(config.boid_count);
     switch (config.method) {
         case HASH:
             hash_table.build(boids);
@@ -153,13 +154,12 @@ int main(int argc, char *argv[]) {
             hash_table.build(boids);
     }
 
+    std::vector<Boid *> boids_in_range;
+
     while (!WindowShouldClose()) {
-        // Update
-        //----------------------------------------------------------------------------------
         for (auto &boid: boids) {
-            std::vector<Boid *> boids_in_range;
-            std::array<std::pair<Boid *, float>, MAX_NEIGHBORS> neighbors;
-            int neighbor_count = 0;
+            boids_in_range.clear();
+            neighbors.clear();
 
             switch (config.method) {
                 case HASH:
@@ -188,11 +188,11 @@ int main(int argc, char *argv[]) {
                 float angle = Vector2Angle(boid.velocity, diff);
                 if (angle > config.fov_angle_radians) continue;
 
-                neighbors[neighbor_count++] = {boid_in_range, dist_sqr};
-                if (neighbor_count > MAX_NEIGHBORS - 1) break;
+                neighbors.push_back({boid_in_range, dist_sqr});
+                if (neighbors.size() > config.max_neighbors - 1) break;
             }
 
-            apply_boid_behaviors(boid, neighbors, neighbor_count,
+            apply_boid_behaviors(boid, neighbors,
                                  config.separation_range_squared, config.separation_strength,
                                  config.alignment_range_squared, config.alignment_strength,
                                  config.cohesion_range_squared, config.cohesion_strength);
@@ -267,15 +267,15 @@ int main(int argc, char *argv[]) {
         //Draws HashTable
         if (config.debug_mode && config.method == HASH) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-                DrawLine(CELL_SIZE * i, 0,CELL_SIZE * i, config.height, LIGHTGRAY);
+                DrawLine(config.cell_size * i, 0, config.cell_size * i, config.height, LIGHTGRAY);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
-                DrawLine(0, CELL_SIZE * i, config.width, CELL_SIZE * i, LIGHTGRAY);
+                DrawLine(0, config.cell_size * i, config.width, config.cell_size * i, LIGHTGRAY);
             }
             for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id)) {
                 int x = index % hash_table.max_width_cells;
                 int y = index / hash_table.max_width_cells;
-                DrawRectangleLines(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, YELLOW);
+                DrawRectangleLines(x * config.cell_size, y * config.cell_size, config.cell_size, config.cell_size, YELLOW);
             }
         }
         if (config.debug_mode && config.method == TREE) {

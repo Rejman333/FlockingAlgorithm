@@ -3,14 +3,13 @@
 void apply_boid_behaviors(
     Boid &boid,
     const std::vector<std::pair<Boid *, float> > &neighbors,
-    int neighbor_count,
     float sep_range_sqr, float sep_strength,
     float ali_range_sqr, float ali_strength,
     float coh_range_sqr, float coh_strength) {
     Vector2 sep_force = {}, ali_force = {}, coh_center = {};
     int sep_count = 0, ali_count = 0, coh_count = 0;
 
-    for (int i = 0; i < neighbor_count; ++i) {
+    for (int i = 0; i < neighbors.size(); ++i) {
         const Boid *other = neighbors[i].first;
         const float dist_sqr = neighbors[i].second;
 
