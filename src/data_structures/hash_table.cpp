@@ -18,7 +18,7 @@ void HashTable::reset() {
 }
 
 
-std::vector<Boid*> HashTable::get_boids_in_range(int cell_index, int scan_range) const {
+std::vector<Boid*> HashTable::get_boids_in_range(int cell_index) const {
     std::vector<Boid*> result;
 
     int cx = cell_index % max_width_cells;
@@ -46,7 +46,7 @@ std::vector<Boid *> &HashTable::get_boids_at_index(const int cell_index) {
     return cells[cell_index];
 }
 
-std::vector<int> HashTable::get_indexes_of_seen_cells(const int cell_index, const int scan_range) const {
+std::vector<int> HashTable::get_indexes_of_seen_cells(const int cell_index) const {
     std::vector<int> result;
     result.reserve((2 * scan_range + 1) * (2 * scan_range + 1));
 

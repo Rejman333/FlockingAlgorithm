@@ -20,5 +20,7 @@ add_executable(Boids src/main.cpp
         src/data_structures/hash_table.cpp
         src/data_structures/hash_table.h
         src/data_structures/boid.cpp
-        src/data_structures/boid.h)
+        src/data_structures/boid.h
+        src/data_structures/QuadTree.cpp
+        src/data_structures/QuadTree.h)
 target_link_libraries(${PROJECT_NAME} raylib)
