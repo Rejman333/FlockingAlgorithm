@@ -10,7 +10,7 @@ struct ClusterCenter {
     Vector2 position;
 };
 
-void run_kmeans(std::vector<Boid*>& boids, int k, std::vector<int>& assignments);
+void run_kmeans(std::vector<Boid>& boids, int k, std::vector<int>& assignments);
 std::vector<Color> generate_random_colors(int k);
 
 

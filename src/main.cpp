@@ -27,7 +27,7 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 5000;
+    int boid_count = 2000;
     bool debug_mode = false;
     METHOD method = HASH;
 
@@ -120,8 +120,7 @@ Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHe
 
 
 
-LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = NUMBER_OF_BOIDS};
-logger Logger(log_cfg);
+
 
 
 int main(int argc, char *argv[]) {
@@ -169,8 +168,9 @@ int main(int argc, char *argv[]) {
     std::vector<int> claster_assingment_to_blolid;
     std::vector<Color> claster_colors = generate_random_colors(K_CLASTERS);
 
-    auto last_kmeans_time = std::chrono::high_resolution_clock::now();
-    // Main game loop
+    LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = config.max_boids_in_tree};
+    logger Logger(log_cfg);
+
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         Logger.startRetrievalTimer();
@@ -273,13 +273,10 @@ int main(int argc, char *argv[]) {
 
         Logger.stopBuildTimer();
 
-
-        static int frame_counter = 0;
-        if (frame_counter++ % 300 == 0) { // np. 600 klatek przy 60 FPS = 10 sekund
-            run_kmeans(boid_ptrs, K_CLASTERS, claster_assingment_to_blolid);
-        }
-
-
+        // static int frame_counter = 0;
+        // if (frame_counter++ % 300 == 0) { // np. 600 klatek przy 60 FPS = 10 sekund
+        //     run_kmeans(boids, K_CLASTERS, claster_assingment_to_blolid);
+        // }
 
         // Draw
         //----------------------------------------------------------------------------------
@@ -311,18 +308,18 @@ int main(int argc, char *argv[]) {
         }
 
 
-        for (size_t j = 0; j < boids.size(); ++j) {
-            const Boid& boid = boids[j];
-            int cluster_id = claster_assingment_to_blolid[j];
-            Color color = claster_colors[cluster_id];
-            DrawCircleV(boid.position, BOID_RADIUS, color);
+        // for (size_t j = 0; j < boids.size(); ++j) {
+        //     const Boid& boid = boids[j];
+        //     int cluster_id = claster_assingment_to_blolid[j];
+        //     Color color = claster_colors[cluster_id];
+        //     DrawCircleV(boid.position, BOID_RADIUS, color);
+        // }
+        for (const auto &boid: boids) {
+            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
+             Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
+             Vector2 endpoint = Vector2Add(boid.position, direction);
+             DrawLineV(boid.position, endpoint, BLACK);
         }
-        //for (const auto &boid: boids) {
-          //  DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
-            // Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
-            // Vector2 endpoint = Vector2Add(boid.position, direction);
-            // DrawLineV(boid.position, endpoint, BLACK);
-        //}
 
         if (config.debug_mode && config.method == TREE) {
             quad_tree.draw(5);
@@ -338,12 +335,12 @@ int main(int argc, char *argv[]) {
         DrawFPS(10, 10);
 
         // logger save to file
-        Logger.updateInfoFPS(static_cast<float>(GetFPS()));
-        auto now = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(now - Logger.last_log_time).count();
-        if (duration >= 10.0) {
-            Logger.saveToFile();
-        }
+        // Logger.updateInfoFPS(static_cast<float>(GetFPS()));
+        // auto now = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration<double>(now - Logger.last_log_time).count();
+        // if (duration >= 10.0) {
+        //     Logger.saveToFile();
+        // }
 
 
         EndDrawing();
