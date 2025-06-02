@@ -24,7 +24,7 @@ add_executable(Boids src/main.cpp
         src/tools/logger.cpp
         src/tools/logger.h
         src/data_structures/k_means.cpp
-        src/data_structures/k_means.h)
+        src/data_structures/k_means.h
         src/data_structures/QuadTree.cpp
         src/data_structures/QuadTree.h)
 target_link_libraries(${PROJECT_NAME} raylib)
