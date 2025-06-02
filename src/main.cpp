@@ -9,8 +9,13 @@
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
 #include "data_structures/QuadTree.h"
+#include "data_structures/k_means.h"
 
+#include "tools/logger.h"
+
+#define K_CLASTERS 5
 #define BOID_RADIUS 2
+
 
 
 enum METHOD {
@@ -114,11 +119,17 @@ Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHe
 }
 
 
+
+LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = NUMBER_OF_BOIDS};
+logger Logger(log_cfg);
+
+
 int main(int argc, char *argv[]) {
     // Initialization
     //--------------------------------------------------------------------------------------
     SimulationConfig config;
     parse_args(argc, argv, config);
+
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
@@ -154,9 +165,18 @@ int main(int argc, char *argv[]) {
             hash_table.build(boids);
     }
 
-    std::vector<Boid *> boids_in_range;
 
-    while (!WindowShouldClose()) {
+    std::vector<int> claster_assingment_to_blolid;
+    std::vector<Color> claster_colors = generate_random_colors(K_CLASTERS);
+
+    auto last_kmeans_time = std::chrono::high_resolution_clock::now();
+    // Main game loop
+    while (!WindowShouldClose()) // Detect window close button or ESC key
+    {
+        Logger.startRetrievalTimer();
+        std::vector<Boid *> boids_in_range;
+
+
         for (auto &boid: boids) {
             boids_in_range.clear();
             neighbors.clear();
@@ -198,6 +218,8 @@ int main(int argc, char *argv[]) {
                                  config.cohesion_range_squared, config.cohesion_strength);
         }
 
+        Logger.stopRetrievalTimer();
+
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
@@ -216,7 +238,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        //Clear Data Structures
+        Logger.startBuildTimer();
         hash_table.reset();
         quad_tree.reset();
 
@@ -249,6 +271,15 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        Logger.stopBuildTimer();
+
+
+        static int frame_counter = 0;
+        if (frame_counter++ % 300 == 0) { // np. 600 klatek przy 60 FPS = 10 sekund
+            run_kmeans(boid_ptrs, K_CLASTERS, claster_assingment_to_blolid);
+        }
+
+
 
         // Draw
         //----------------------------------------------------------------------------------
@@ -278,6 +309,21 @@ int main(int argc, char *argv[]) {
                 DrawRectangleLines(x * config.cell_size, y * config.cell_size, config.cell_size, config.cell_size, YELLOW);
             }
         }
+
+
+        for (size_t j = 0; j < boids.size(); ++j) {
+            const Boid& boid = boids[j];
+            int cluster_id = claster_assingment_to_blolid[j];
+            Color color = claster_colors[cluster_id];
+            DrawCircleV(boid.position, BOID_RADIUS, color);
+        }
+        //for (const auto &boid: boids) {
+          //  DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
+            // Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
+            // Vector2 endpoint = Vector2Add(boid.position, direction);
+            // DrawLineV(boid.position, endpoint, BLACK);
+        //}
+
         if (config.debug_mode && config.method == TREE) {
             quad_tree.draw(5);
             quad_tree.draw_t(boids[0].position, config.cohesion_range, 3);
@@ -290,6 +336,16 @@ int main(int argc, char *argv[]) {
         }
 
         DrawFPS(10, 10);
+
+        // logger save to file
+        Logger.updateInfoFPS(static_cast<float>(GetFPS()));
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(now - Logger.last_log_time).count();
+        if (duration >= 10.0) {
+            Logger.saveToFile();
+        }
+
+
         EndDrawing();
     }
 
