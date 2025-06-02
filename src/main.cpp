@@ -8,11 +8,15 @@
 #include "raymath.h"
 #include "data_structures/hash_table.h"
 #include "data_structures/Boid.h"
+#include "data_structures/k_means.h"
 
-#define NUMBER_OF_BOIDS 2000
+#include "tools/logger.h"
+
+#define NUMBER_OF_BOIDS 3000
 #define BOID_RADIUS 2
 #define CELL_SIZE 50
 #define MAX_NEIGHBORS 20
+#define K_CLASTERS 5
 
 
 void fill_boids(std::array<Boid, NUMBER_OF_BOIDS> &boids, const int screenWidth, const int screenHeight,
@@ -46,6 +50,10 @@ Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHe
 }
 
 
+LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = NUMBER_OF_BOIDS};
+logger Logger(log_cfg);
+
+
 int main() {
     // Initialization
     //--------------------------------------------------------------------------------------
@@ -56,6 +64,12 @@ int main() {
 
     auto hash_table = HashTable(screenWidth, screenHeight,CELL_SIZE);
     std::array<Boid, NUMBER_OF_BOIDS> boids{};
+    std::vector<Boid*> boid_ptrs;
+    boid_ptrs.reserve(boids.size());
+    for (auto& b : boids) {
+        boid_ptrs.push_back(&b);
+    }
+
     fill_boids(boids, screenWidth, screenHeight, hash_table);
 
 
@@ -85,13 +99,18 @@ int main() {
     InitWindow(screenWidth, screenHeight, "Boids");
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
+    std::vector<int> claster_assingment_to_blolid;
+    std::vector<Color> claster_colors = generate_random_colors(K_CLASTERS);
+
+    auto last_kmeans_time = std::chrono::high_resolution_clock::now();
 
     // Main game loop
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
+        Logger.startRetrievalTimer();
         // Update
         //----------------------------------------------------------------------------------
-        int i = 0;;
+        int i = 0;
         for (auto &boid: boids) {
             std::vector<Boid *> boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id, scan_range_in_cells);
             std::ranges::shuffle(boids_in_range, rng);
@@ -120,6 +139,8 @@ int main() {
                                  cohesion_range_squared, cohesion_strength);
         }
 
+        Logger.stopRetrievalTimer();
+
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 m_pos = GetMousePosition();
             for (auto &boid: boids) {
@@ -137,6 +158,8 @@ int main() {
                 }
             }
         }
+
+        Logger.startBuildTimer();
 
         // teleports to other side, and adjust velocity]
         hash_table.reset();
@@ -158,6 +181,15 @@ int main() {
             boid.position.y = fmodf(boid.position.y + screenHeight, screenHeight);
             boid.hash_table_id = hash_table.put(boid.position, &boid);
         }
+
+        Logger.stopBuildTimer();
+
+
+        static int frame_counter = 0;
+        if (frame_counter++ % 300 == 0) { // np. 600 klatek przy 60 FPS = 10 sekund
+            run_kmeans(boid_ptrs, K_CLASTERS, claster_assingment_to_blolid);
+        }
+
 
 
         // Draw
@@ -187,13 +219,18 @@ int main() {
             }
         }
 
-
-        for (const auto &boid: boids) {
-            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
+        for (size_t j = 0; j < boids.size(); ++j) {
+            const Boid& boid = boids[j];
+            int cluster_id = claster_assingment_to_blolid[j];
+            Color color = claster_colors[cluster_id];
+            DrawCircleV(boid.position, BOID_RADIUS, color);
+        }
+        //for (const auto &boid: boids) {
+          //  DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
             // Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
             // Vector2 endpoint = Vector2Add(boid.position, direction);
             // DrawLineV(boid.position, endpoint, BLACK);
-        }
+        //}
 
         if (is_debug) {
             DrawCircleLinesV(boids[0].position, alignment_range, GREEN);
@@ -201,7 +238,20 @@ int main() {
         }
 
 
+
         DrawFPS(10, 10);
+
+        // logger save to file
+        Logger.updateInfoFPS(static_cast<float>(GetFPS()));
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(now - Logger.last_log_time).count();
+        if (duration >= 10.0) {
+            Logger.saveToFile();
+        }
+
+
+
+
         EndDrawing();
     }
 
