@@ -22,7 +22,7 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 8000;
+    int boid_count = 5000;
     bool debug_mode = false;
     METHOD method = HASH;
 
@@ -181,9 +181,8 @@ int main(int argc, char *argv[]) {
 
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
                 diff = Vector2Normalize(diff);
-                Vector2 dir = Vector2Normalize(boid.velocity);
 
-                float dot = Vector2DotProduct(dir, diff);
+                float dot = Vector2DotProduct(boid.velocity_norm, diff);
                 if (dot < config.cos_half_fov) continue;
 
                 neighbors.push_back({boid_in_range, dist_sqr});
@@ -225,26 +224,36 @@ int main(int argc, char *argv[]) {
 
 
         for (auto &boid: boids) {
-            if (Vector2Length(boid.acceleration) > config.max_force) {
-                boid.acceleration = Vector2Scale(Vector2Normalize(boid.acceleration), config.max_force);
+            float acc_len = Vector2Length(boid.acceleration);
+            if (acc_len > config.max_force) {
+                boid.acceleration = Vector2Scale(boid.acceleration, config.max_force / acc_len);
             }
 
-            boid.velocity = Vector2Add(boid.velocity, boid.acceleration);
-            if (Vector2Length(boid.velocity) > config.max_velocity) {
-                boid.velocity = Vector2Scale(Vector2Normalize(boid.velocity), config.max_velocity);
+            Vector2 full_velocity = Vector2Scale(boid.velocity_norm, boid.speed);
+
+            full_velocity = Vector2Add(full_velocity, boid.acceleration);
+
+            float new_speed = Vector2Length(full_velocity);
+            if (new_speed > config.max_velocity) {
+                new_speed = config.max_velocity;
+                full_velocity = Vector2Scale(Vector2Normalize(full_velocity), new_speed);
             }
 
-            boid.position = Vector2Add(boid.position, boid.velocity);
-            boid.acceleration = {0.0f, 0.0f}; // reset
+            boid.speed = new_speed;
+            boid.velocity_norm = (new_speed > 0.001f)
+                ? Vector2Scale(full_velocity, 1.0f / new_speed)
+                : Vector2Zero();
 
+            Vector2 velocity_now = Vector2Scale(boid.velocity_norm, boid.speed);
+            boid.position = Vector2Add(boid.position, velocity_now);
+
+            boid.acceleration = {0.0f, 0.0f};
 
             boid.position.x = fmodf(boid.position.x + static_cast<float>(config.width),
                                     static_cast<float>(config.width));
             boid.position.y = fmodf(boid.position.y + static_cast<float>(config.height),
                                     static_cast<float>(config.height));
 
-
-            //rebuild data structures
             if (config.method == TREE) {
                 quad_tree.insert(&boid);
             } else if (config.method == HASH) {
@@ -287,13 +296,16 @@ int main(int argc, char *argv[]) {
         }
 
         if (config.debug_mode) {
-            for (auto boid: first_boid_neighbors) {
+            for (auto boid : first_boid_neighbors) {
                 DrawCircleV(boid->position, BOID_RADIUS, (Color){138, 204, 106, 255});
             }
 
             DrawCircleV(boids[0].position, BOID_RADIUS, RED);
-            Vector2 end_point = Vector2Add(boids[0].position, Vector2Scale(boids[0].velocity, 10.0f));
+
+            Vector2 full_velocity = Vector2Scale(boids[0].velocity_norm, boids[0].speed * 10.0f);
+            Vector2 end_point = Vector2Add(boids[0].position, full_velocity);
             DrawLineV(boids[0].position, end_point, BLUE);
+
             DrawCircleLinesV(boids[0].position, config.alignment_range, GREEN);
             DrawCircleLinesV(boids[0].position, config.separation_range, GREEN);
         }

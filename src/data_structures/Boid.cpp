@@ -21,7 +21,7 @@ void apply_boid_behaviors(
         }
 
         if (dist_sqr < ali_range_sqr) {
-            ali_force = Vector2Add(ali_force, other->velocity);
+            ali_force = Vector2Add(ali_force, Vector2Scale(other->velocity_norm, other->speed));
             ali_count++;
         }
 
@@ -57,11 +57,13 @@ std::vector<Boid> fill_boids(const size_t boids_number,const int screenWidth, co
     std::mt19937 gen(rd());
     std::uniform_real_distribution distribution_x(0.0f, static_cast<float>(screenWidth));
     std::uniform_real_distribution distribution_y(0.0f, static_cast<float>(screenHeight));
-    std::uniform_real_distribution distribution(-5.0f, 5.0f);
+    std::uniform_real_distribution distribution(1.f, 5.0f);
+    std::uniform_real_distribution distribution_normalize(-1.f, 1.f);
 
     for (auto &boid: boids) {
         boid.position = {distribution_x(gen), distribution_y(gen)};
-        boid.velocity = {distribution(gen), distribution(gen)};
+        boid.velocity_norm = {distribution_normalize(gen), distribution_normalize(gen)};
+        boid.speed = distribution(gen);
         boid.acceleration = {0.0f, 0.0f};
     }
 
