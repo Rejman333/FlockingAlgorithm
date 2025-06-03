@@ -20,9 +20,9 @@ enum METHOD {
 };
 
 struct SimulationConfig {
-    int width = 1400;
-    int height = 1000;
-    int boid_count = 3000;
+    int width = 1200;
+    int height = 800;
+    int boid_count = 2000;
     bool debug_mode = false;
     METHOD method = HASH;
 
@@ -36,10 +36,10 @@ struct SimulationConfig {
 
     float separation_strength = 1.3f;
     float alignment_strength = 0.6f;
-    float cohesion_strength = 0.80f;
+    float cohesion_strength = 0.8f;
 
     float max_velocity = 3.5f;
-    float max_force = 0.20f;
+    float max_force = 0.10f;
 
     float fov_angle_radians = 60.0f * DEG2RAD;
 
@@ -138,9 +138,7 @@ int main(int argc, char *argv[]) {
     }));
 
     std::vector<Boid> boids = fill_boids(config.boid_count, config.width, config.height);
-    std::vector<std::pair<Boid *, float> > neighbors;
-    neighbors.reserve(config.max_boids_in_tree);
-    std::vector<Boid *> boids_in_range;
+    std::vector<std::pair<Boid *, float> > neighbors(config.boid_count);
     switch (config.method) {
         case HASH:
             hash_table.build(boids);
@@ -149,33 +147,36 @@ int main(int argc, char *argv[]) {
             quad_tree.build(boids);
             break;
         case FORCE:
-            for (auto &boid1: boids) {
-                boids_in_range.push_back(&boid1);
-            }
+            break;
         default:
             hash_table.build(boids);
     }
 
+    std::vector<Boid *> boids_in_range;
 
     while (!WindowShouldClose()) {
         for (auto &boid: boids) {
+            boids_in_range.clear();
+            neighbors.clear();
+
             switch (config.method) {
                 case HASH:
                     boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id);
-                    std::ranges::shuffle(boids_in_range, rng);
                     break;
                 case TREE:
                     boids_in_range = quad_tree.query(boid.position, config.cohesion_range);
-                    std::ranges::shuffle(boids_in_range, rng);
                     break;
                 case FORCE:
+                    for (auto &boid: boids) {
+                        boids_in_range.push_back(&boid);
+                    }
                     break;
 
                 default:
                     boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id);
-                    std::ranges::shuffle(boids_in_range, rng);
             }
 
+            std::ranges::shuffle(boids_in_range, rng);
 
             for (auto boid_in_range: boids_in_range) {
                 if (boid_in_range == &boid) continue;
@@ -218,10 +219,6 @@ int main(int argc, char *argv[]) {
         //Clear Data Structures
         hash_table.reset();
         quad_tree.reset();
-        neighbors.clear();
-        if (config.method != FORCE) {
-            boids_in_range.clear();
-        }
 
 
         for (auto &boid: boids) {
@@ -237,16 +234,19 @@ int main(int argc, char *argv[]) {
             boid.position = Vector2Add(boid.position, boid.velocity);
             boid.acceleration = {0.0f, 0.0f}; // reset
 
-            boid.position =  wrap_position(boid.position, config.width, config.height);
+
+            boid.position.x = fmodf(boid.position.x + static_cast<float>(config.width),
+                                    static_cast<float>(config.width));
+            boid.position.y = fmodf(boid.position.y + static_cast<float>(config.height),
+                                    static_cast<float>(config.height));
 
 
-            //rebuild datastructures
+            //rebuild data structures
             if (config.method == TREE) {
                 quad_tree.insert(&boid);
             } else if (config.method == HASH) {
                 boid.hash_table_id = hash_table.put(boid.position, &boid);
             }
-
         }
 
 
