@@ -11,8 +11,8 @@
 #include "data_structures/QuadTree.h"
 
 #define BOID_RADIUS 2
-
-
+Color transparentGray = {LIGHTGRAY.r, LIGHTGRAY.g, LIGHTGRAY.b, 80};
+Color transparent_yellow = {YELLOW.r, YELLOW.g, YELLOW.b, 80};
 enum METHOD {
     HASH,
     TREE,
@@ -22,9 +22,9 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 5000;
-    bool debug_mode = false;
-    METHOD method = HASH;
+    int boid_count = 2000;
+    bool debug_mode = true;
+    METHOD method = TREE;
 
     float separation_range = 20.0f;
     float alignment_range = 50.0f;
@@ -34,8 +34,8 @@ struct SimulationConfig {
     float alignment_range_squared = alignment_range * alignment_range;
     float cohesion_range_squared = cohesion_range * cohesion_range;
 
-    float separation_strength = 1.3f;
-    float alignment_strength = 0.6f;
+    float separation_strength = 1.6f;
+    float alignment_strength = 0.8f;
     float cohesion_strength = 0.8f;
 
     float max_velocity = 2.0f;
@@ -271,28 +271,29 @@ int main(int argc, char *argv[]) {
             DrawRectangle(0, 0, config.width, config.width, Fade(BLACK, 0.12f));
         }
 
-        for (const auto &boid: boids) {
-            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
-        }
-
         //Draws HashTable
         if (config.debug_mode && config.method == HASH) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-                DrawLine(config.cell_size * i, 0, config.cell_size * i, config.height, LIGHTGRAY);
+
+                DrawLine(config.cell_size * i, 0, config.cell_size * i, config.height, transparentGray);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
-                DrawLine(0, config.cell_size * i, config.width, config.cell_size * i, LIGHTGRAY);
+                DrawLine(0, config.cell_size * i, config.width, config.cell_size * i, transparentGray);
             }
             for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id)) {
                 int x = index % hash_table.max_width_cells;
                 int y = index / hash_table.max_width_cells;
                 DrawRectangleLines(x * config.cell_size, y * config.cell_size, config.cell_size, config.cell_size,
-                                   YELLOW);
+                                   transparent_yellow);
             }
         }
         if (config.debug_mode && config.method == TREE) {
             quad_tree.draw(5);
             quad_tree.draw_t(boids[0].position, config.cohesion_range, 3);
+        }
+
+        for (const auto &boid: boids) {
+            DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
         }
 
         if (config.debug_mode) {
