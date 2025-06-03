@@ -22,26 +22,26 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 2000;
-    bool debug_mode = true;
-    METHOD method = TREE;
+    int boid_count = 4000;
+    bool debug_mode = false;
+    METHOD method = HASH;
 
-    float separation_range = 20.0f;
-    float alignment_range = 50.0f;
+    float separation_range = 10.0f;
+    float alignment_range = 60.0f;
     float cohesion_range = 60.0f;
 
     float separation_range_squared = separation_range * separation_range;
     float alignment_range_squared = alignment_range * alignment_range;
     float cohesion_range_squared = cohesion_range * cohesion_range;
 
-    float separation_strength = 1.6f;
-    float alignment_strength = 0.8f;
-    float cohesion_strength = 0.8f;
+    float separation_strength = 4.0f;
+    float alignment_strength = 1.5f;
+    float cohesion_strength = 1.5f;
 
     float max_velocity = 2.0f;
     float max_force = 0.10f;
 
-    float fov_angle_radians = 90.0f * DEG2RAD;
+    float fov_angle_radians = 120.0f * DEG2RAD;
     float cos_half_fov = cosf(fov_angle_radians / 2.0f);
 
     int cell_size = 25;
@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (config.debug_mode && config.method == TREE) {
-            quad_tree.draw(5);
+            quad_tree.draw(3);
             quad_tree.draw_t(boids[0].position, config.cohesion_range, 3);
         }
 
