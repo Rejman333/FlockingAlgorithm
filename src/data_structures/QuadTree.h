@@ -3,6 +3,8 @@
 
 #include "Boid.h"
 
+
+
 template<int MAX_CAPACITY>
 class QuadTree {
     const Rectangle boundary{0, 0, 0, 0};
@@ -167,7 +169,7 @@ public:
     }
 
     void draw(float line_thickness) const {
-        DrawRectangleLinesEx(boundary, line_thickness, DARKGRAY);
+        DrawRectangleLinesEx(boundary, line_thickness, {LIGHTGRAY.r, LIGHTGRAY.g, LIGHTGRAY.b, 80});
         float new_thickness = std::max(line_thickness - 1, 1.f);
         if (northeast) {
             northeast->draw(new_thickness);
@@ -199,7 +201,7 @@ public:
                 southwest->draw_t(center, radius, new_thickness);
             }
         } else {
-            DrawRectangleLinesEx(boundary, line_thickness, YELLOW);
+            DrawRectangleLinesEx(boundary, line_thickness, {YELLOW.r, YELLOW.g, YELLOW.b, 80});
         }
     }
 };

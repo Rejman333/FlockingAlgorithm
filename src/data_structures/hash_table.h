@@ -38,7 +38,7 @@ public:
 
 
     void build(std::vector<Boid>& boids) {
-        for (auto boid: boids) {
+        for (auto &boid: boids) {
             boid.hash_table_id = put(boid.position, &boid);
         }
     }

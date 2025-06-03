@@ -9,7 +9,8 @@
 
 struct Boid {
     Vector2 position;
-    Vector2 velocity;
+    Vector2 velocity_norm;
+    float speed;
     Vector2 acceleration;
 
     int hash_table_id;
