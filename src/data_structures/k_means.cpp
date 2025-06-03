@@ -22,7 +22,7 @@ static float distance_sqr(const Vector2& a, const Vector2& b) {
     return dx * dx + dy * dy;
 }
 
-void run_kmeans(std::vector<Boid*>& boids, int k, std::vector<int>& assignments) {
+void run_kmeans(std::vector<Boid>& boids, int k, std::vector<int>& assignments) {
     const int max_iterations = 100;
     const float epsilon = 0.001f;
 
@@ -32,7 +32,7 @@ void run_kmeans(std::vector<Boid*>& boids, int k, std::vector<int>& assignments)
     // Initialize cluster centers randomly
     for (int i = 0; i < k; ++i) {
         int idx = rand() % boids.size();
-        centers[i].position = boids[idx]->position;
+        centers[i].position = boids[idx].position;
     }
 
     for (int iter = 0; iter < max_iterations; ++iter) {
@@ -44,7 +44,7 @@ void run_kmeans(std::vector<Boid*>& boids, int k, std::vector<int>& assignments)
             int best_cluster = -1;
 
             for (int c = 0; c < k; ++c) {
-                float dist = distance_sqr(boids[i]->position, centers[c].position);
+                float dist = distance_sqr(boids[i].position, centers[c].position);
                 if (dist < min_dist) {
                     min_dist = dist;
                     best_cluster = c;
@@ -63,8 +63,8 @@ void run_kmeans(std::vector<Boid*>& boids, int k, std::vector<int>& assignments)
 
         for (size_t i = 0; i < boids.size(); ++i) {
             int cluster = assignments[i];
-            new_centers[cluster].x += boids[i]->position.x;
-            new_centers[cluster].y += boids[i]->position.y;
+            new_centers[cluster].x += boids[i].position.x;
+            new_centers[cluster].y += boids[i].position.y;
             counts[cluster]++;
         }
 

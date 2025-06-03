@@ -27,7 +27,8 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 1000;
+
+    int boid_count = 2000;
     bool debug_mode = false;
     METHOD method = TREE;
 
@@ -183,7 +184,13 @@ int main(int argc, char *argv[]) {
     }
 
 
-    // Main game loop
+
+    std::vector<int> claster_assingment_to_blolid;
+    std::vector<Color> claster_colors = generate_random_colors(K_CLASTERS);
+
+    LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = config.max_boids_in_tree};
+    logger Logger(log_cfg);
+
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         Logger.startRetrievalTimer();
@@ -280,9 +287,6 @@ int main(int argc, char *argv[]) {
             }
         }
 
-
-
-
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
@@ -314,6 +318,15 @@ int main(int argc, char *argv[]) {
 
 
 
+
+
+        // for (size_t j = 0; j < boids.size(); ++j) {
+        //     const Boid& boid = boids[j];
+        //     int cluster_id = claster_assingment_to_blolid[j];
+        //     Color color = claster_colors[cluster_id];
+        //     DrawCircleV(boid.position, BOID_RADIUS, color);
+        // }
+
         for (const auto &boid: boids) {
             DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
              Vector2 direction = Vector2Scale(Vector2Normalize(boid.velocity), BOID_RADIUS * 2.0f);
@@ -334,6 +347,16 @@ int main(int argc, char *argv[]) {
 
         DrawFPS(10, 10);
         Logger.tick(GetFPS());
+
+
+
+        // logger save to file
+        // Logger.updateInfoFPS(static_cast<float>(GetFPS()));
+        // auto now = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration<double>(now - Logger.last_log_time).count();
+        // if (duration >= 10.0) {
+        //     Logger.saveToFile();
+        // }
 
 
 
