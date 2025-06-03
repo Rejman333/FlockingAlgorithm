@@ -11,6 +11,7 @@
 #include "data_structures/QuadTree.h"
 //#include "data_structures/k_means.h"
 
+#include "data_structures/k_means.h"
 #include "tools/logger.h"
 
 #define K_CLASTERS 5
@@ -189,7 +190,6 @@ int main(int argc, char *argv[]) {
     std::vector<Color> claster_colors = generate_random_colors(K_CLASTERS);
 
     LogConfig log_cfg{.method_name = "HashTable", .number_of_boids = config.max_boids_in_tree};
-    logger Logger(log_cfg);
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
