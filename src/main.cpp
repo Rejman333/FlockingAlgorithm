@@ -22,7 +22,7 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 5000;
+    int boid_count = 8000;
     bool debug_mode = false;
     METHOD method = HASH;
 
