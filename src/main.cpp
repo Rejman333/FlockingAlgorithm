@@ -22,11 +22,11 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 2000;
+    int boid_count = 5000;
     bool debug_mode = false;
     METHOD method = HASH;
 
-    float separation_range = 15.0f;
+    float separation_range = 20.0f;
     float alignment_range = 50.0f;
     float cohesion_range = 60.0f;
 
@@ -38,15 +38,16 @@ struct SimulationConfig {
     float alignment_strength = 0.6f;
     float cohesion_strength = 0.8f;
 
-    float max_velocity = 3.5f;
+    float max_velocity = 2.0f;
     float max_force = 0.10f;
 
-    float fov_angle_radians = 60.0f * DEG2RAD;
+    float fov_angle_radians = 90.0f * DEG2RAD;
+    float cos_half_fov = cosf(fov_angle_radians / 2.0f);
 
-    int cell_size = 50;
+    int cell_size = 25;
     int max_boids_in_tree = 10;
 
-    int max_neighbors = 20;
+    int max_neighbors = 10;
 };
 
 
@@ -91,6 +92,7 @@ void parse_args(int argc, char *argv[], SimulationConfig &config) {
             config.max_force = std::stof(argv[++i]);
         } else if (arg == "-fov" && i + 1 < argc) {
             config.fov_angle_radians = std::stof(argv[++i]) * DEG2RAD;
+            config.cos_half_fov = cosf(config.fov_angle_radians / 2.0f);
         } else if (arg == "-cell_size" && i + 1 < argc) {
             config.cell_size = std::stoi(argv[++i]);
         } else if (arg == "-max_tree" && i + 1 < argc) {
@@ -103,24 +105,13 @@ void parse_args(int argc, char *argv[], SimulationConfig &config) {
     }
 }
 
-Vector2 wrap_position(Vector2 pos, const float screenWidth, const float screenHeight) {
-    if (pos.x < 0) pos.x = screenWidth;
-    else if (pos.x > screenWidth) pos.x = 0;
-
-    if (pos.y < 0) pos.y = screenHeight;
-    else if (pos.y > screenHeight) pos.y = 0;
-
-    return pos;
-}
-
-
 int main(int argc, char *argv[]) {
     // Initialization
     //--------------------------------------------------------------------------------------
     SimulationConfig config;
     parse_args(argc, argv, config);
 
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    //SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(config.width, config.height, "Boids");
     SetTargetFPS(60);
@@ -139,6 +130,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<Boid> boids = fill_boids(config.boid_count, config.width, config.height);
     std::vector<std::pair<Boid *, float> > neighbors(config.boid_count);
+    std::vector<Boid *> first_boid_neighbors;
     switch (config.method) {
         case HASH:
             hash_table.build(boids);
@@ -155,6 +147,7 @@ int main(int argc, char *argv[]) {
     std::vector<Boid *> boids_in_range;
 
     while (!WindowShouldClose()) {
+        first_boid_neighbors.clear();
         for (auto &boid: boids) {
             boids_in_range.clear();
             neighbors.clear();
@@ -176,7 +169,9 @@ int main(int argc, char *argv[]) {
                     boids_in_range = hash_table.get_boids_in_range(boid.hash_table_id);
             }
 
-            std::ranges::shuffle(boids_in_range, rng);
+            if (boids_in_range.size() > config.max_neighbors) {
+                std::ranges::shuffle(boids_in_range, rng);
+            }
 
             for (auto boid_in_range: boids_in_range) {
                 if (boid_in_range == &boid) continue;
@@ -185,11 +180,19 @@ int main(int argc, char *argv[]) {
                 if (dist_sqr > config.cohesion_range_squared) continue;
 
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
-                float angle = Vector2Angle(boid.velocity, diff);
-                if (angle > config.fov_angle_radians) continue;
+                diff = Vector2Normalize(diff);
+                Vector2 dir = Vector2Normalize(boid.velocity);
+
+                float dot = Vector2DotProduct(dir, diff);
+                if (dot < config.cos_half_fov) continue;
 
                 neighbors.push_back({boid_in_range, dist_sqr});
                 if (neighbors.size() > config.max_neighbors - 1) break;
+            }
+            if (config.debug_mode && &boid == &boids[0]) {
+                for (auto pair: neighbors) {
+                    first_boid_neighbors.push_back(pair.first);
+                }
             }
 
             apply_boid_behaviors(boid, neighbors,
@@ -263,7 +266,6 @@ int main(int argc, char *argv[]) {
             DrawCircleV(boid.position, BOID_RADIUS, (Color){38, 104, 106, 255});
         }
 
-
         //Draws HashTable
         if (config.debug_mode && config.method == HASH) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
@@ -275,7 +277,8 @@ int main(int argc, char *argv[]) {
             for (auto index: hash_table.get_indexes_of_seen_cells(boids[0].hash_table_id)) {
                 int x = index % hash_table.max_width_cells;
                 int y = index / hash_table.max_width_cells;
-                DrawRectangleLines(x * config.cell_size, y * config.cell_size, config.cell_size, config.cell_size, YELLOW);
+                DrawRectangleLines(x * config.cell_size, y * config.cell_size, config.cell_size, config.cell_size,
+                                   YELLOW);
             }
         }
         if (config.debug_mode && config.method == TREE) {
@@ -284,7 +287,13 @@ int main(int argc, char *argv[]) {
         }
 
         if (config.debug_mode) {
+            for (auto boid: first_boid_neighbors) {
+                DrawCircleV(boid->position, BOID_RADIUS, (Color){138, 204, 106, 255});
+            }
+
             DrawCircleV(boids[0].position, BOID_RADIUS, RED);
+            Vector2 end_point = Vector2Add(boids[0].position, Vector2Scale(boids[0].velocity, 10.0f));
+            DrawLineV(boids[0].position, end_point, BLUE);
             DrawCircleLinesV(boids[0].position, config.alignment_range, GREEN);
             DrawCircleLinesV(boids[0].position, config.separation_range, GREEN);
         }
