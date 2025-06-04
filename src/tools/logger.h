@@ -1,20 +1,18 @@
+#pragma once
+
 #include <iostream>
 #include <string>
 #include <chrono>
 #include <fstream>
-#ifndef LOGGER_H
-#define LOGGER_H
 
 
-struct LogConfig
-{
+struct LogConfig {
     std::string method_name; //chosen algorithm
     int number_of_boids;
     double log_interval_seconds = 10.0;
 };
 
-class logger
-{
+class logger {
 private:
     LogConfig config;
     std::ofstream file;
@@ -30,22 +28,24 @@ private:
     double retrieval_time = 0.0;
 
 public:
-    explicit logger(const LogConfig& cfg);
+    explicit logger(const LogConfig &cfg);
+
     ~logger();
 
     void startBuildTimer();
+
     void stopBuildTimer();
 
     void startRetrievalTimer();
+
     void stopRetrievalTimer();
 
     void updateInfoFPS(float fps);
+
     void saveToFile();
+
     void tick(float fps);
 
 
     std::chrono::high_resolution_clock::time_point last_log_time;
 };
-
-
-#endif //LOGGER_H

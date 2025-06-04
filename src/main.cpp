@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <random>
+#include <ranges>
 
 #include "raylib.h"
 #include "raymath.h"
@@ -13,6 +14,7 @@
 #define BOID_RADIUS 2
 Color transparentGray = {LIGHTGRAY.r, LIGHTGRAY.g, LIGHTGRAY.b, 80};
 Color transparent_yellow = {YELLOW.r, YELLOW.g, YELLOW.b, 80};
+
 enum METHOD {
     HASH,
     TREE,
@@ -22,7 +24,7 @@ enum METHOD {
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 4000;
+    int boid_count = 3500;
     bool debug_mode = false;
     METHOD method = HASH;
 
@@ -45,7 +47,7 @@ struct SimulationConfig {
     float cos_half_fov = cosf(fov_angle_radians / 2.0f);
 
     int cell_size = 25;
-    int max_boids_in_tree = 10;
+    int max_boids_in_tree = 30;
 
     int max_neighbors = 10;
 };
@@ -160,8 +162,8 @@ int main(int argc, char *argv[]) {
                     boids_in_range = quad_tree.query(boid.position, config.cohesion_range);
                     break;
                 case FORCE:
-                    for (auto &boid: boids) {
-                        boids_in_range.push_back(&boid);
+                    for (auto &bf_boid: boids) {
+                        boids_in_range.push_back(&bf_boid);
                     }
                     break;
 
@@ -182,15 +184,14 @@ int main(int argc, char *argv[]) {
                 Vector2 diff = Vector2Subtract(boid_in_range->position, boid.position);
                 diff = Vector2Normalize(diff);
 
-                float dot = Vector2DotProduct(boid.velocity_norm, diff);
-                if (dot < config.cos_half_fov) continue;
+                if (Vector2DotProduct(boid.velocity_norm, diff) < config.cos_half_fov) continue;
 
-                neighbors.push_back({boid_in_range, dist_sqr});
+                neighbors.emplace_back(boid_in_range, dist_sqr);
                 if (neighbors.size() > config.max_neighbors - 1) break;
             }
             if (config.debug_mode && &boid == &boids[0]) {
-                for (auto pair: neighbors) {
-                    first_boid_neighbors.push_back(pair.first);
+                for (auto key: neighbors | std::views::keys) {
+                    first_boid_neighbors.push_back(key);
                 }
             }
 
@@ -241,8 +242,8 @@ int main(int argc, char *argv[]) {
 
             boid.speed = new_speed;
             boid.velocity_norm = (new_speed > 0.001f)
-                ? Vector2Scale(full_velocity, 1.0f / new_speed)
-                : Vector2Zero();
+                                     ? Vector2Scale(full_velocity, 1.0f / new_speed)
+                                     : Vector2Zero();
 
             Vector2 velocity_now = Vector2Scale(boid.velocity_norm, boid.speed);
             boid.position = Vector2Add(boid.position, velocity_now);
@@ -274,7 +275,6 @@ int main(int argc, char *argv[]) {
         //Draws HashTable
         if (config.debug_mode && config.method == HASH) {
             for (int i = 0; i < hash_table.max_width_cells; ++i) {
-
                 DrawLine(config.cell_size * i, 0, config.cell_size * i, config.height, transparentGray);
             }
             for (int i = 0; i < hash_table.max_height_cells; ++i) {
@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (config.debug_mode) {
-            for (auto boid : first_boid_neighbors) {
+            for (auto boid: first_boid_neighbors) {
                 DrawCircleV(boid->position, BOID_RADIUS, (Color){138, 204, 106, 255});
             }
 
