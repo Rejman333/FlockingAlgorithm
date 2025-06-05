@@ -23,9 +23,9 @@ Color transparent_yellow = {YELLOW.r, YELLOW.g, YELLOW.b, 80};
 struct SimulationConfig {
     int width = 1200;
     int height = 800;
-    int boid_count = 1000;
-    bool debug_mode = true;
-    METHOD method = FORCE;
+    int boid_count = 12000;
+    bool debug_mode = false;
+    METHOD method = HASH;
 
     bool k_mean = false;
     int k_mean_clusters = 3;

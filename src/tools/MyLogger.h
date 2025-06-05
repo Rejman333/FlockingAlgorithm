@@ -17,6 +17,8 @@ public:
 
     void recordCheckTime(double microseconds);
 
+    void record_k_meansTimesTime(double microseconds);
+
 private:
     void report();
     double average(const std::vector<double>& v) const;
@@ -35,5 +37,6 @@ private:
     std::vector<double> buildTimes;
     std::vector<double> retrievalTimes;
     std::vector<double> checkTimes;
+    std::vector<double> k_meansTimes;
 
 };

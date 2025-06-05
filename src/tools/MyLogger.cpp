@@ -64,6 +64,10 @@ void MyLogger::recordCheckTime(double microseconds) {
     checkTimes.push_back(microseconds);
 }
 
+void MyLogger::record_k_meansTimesTime(double microseconds) {
+    k_meansTimes.push_back(microseconds);
+}
+
 void MyLogger::report() {
     double avgFPS = fpsHistory.empty() ? 0.0 : average(std::vector<double>(fpsHistory.begin(), fpsHistory.end()));
     double avgBuild = average(buildTimes);
