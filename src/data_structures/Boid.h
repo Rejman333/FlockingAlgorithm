@@ -14,7 +14,7 @@ struct Boid {
     Vector2 acceleration;
 
     int hash_table_id;
-    int cluster_id = -1;
+    int cluster_id = 0;
 };
 
 void apply_boid_behaviors(
