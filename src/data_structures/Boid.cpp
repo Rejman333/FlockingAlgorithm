@@ -16,7 +16,10 @@ void apply_boid_behaviors(
         Vector2 diff = Vector2Subtract(boid.position, other->position);
 
         if (dist_sqr < sep_range_sqr && dist_sqr > 0.01f) {
-            sep_force = Vector2Add(sep_force, Vector2Normalize(diff));
+            float inv_dist = 1.0f / sqrtf(dist_sqr); // większa siła przy bliskich boidach
+            Vector2 diff = Vector2Subtract(boid.position, other->position);
+            diff = Vector2Scale(Vector2Normalize(diff), inv_dist);
+            sep_force = Vector2Add(sep_force, diff);
             sep_count++;
         }
 

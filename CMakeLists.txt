@@ -21,10 +21,11 @@ add_executable(Boids src/main.cpp
         src/data_structures/hash_table.h
         src/data_structures/boid.cpp
         src/data_structures/boid.h
-        src/tools/logger.cpp
-        src/tools/logger.h
         src/data_structures/k_means.cpp
         src/data_structures/k_means.h
         src/data_structures/QuadTree.cpp
-        src/data_structures/QuadTree.h)
+        src/data_structures/QuadTree.h
+        src/tools/methods.h
+        src/tools/MyLogger.cpp
+        src/tools/MyLogger.h)
 target_link_libraries(${PROJECT_NAME} raylib)
