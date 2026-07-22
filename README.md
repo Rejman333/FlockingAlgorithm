@@ -25,7 +25,7 @@ The simulation provides parameters for the number of boids, interaction ranges, 
 
 ## Demo
 
-![Boids](media/boids.gif)
+![Boids](https://github.com/Rejman333/FlockingAlgorithm/blob/master/media/Boids.gif)
 
 ## Running the simulation
 
